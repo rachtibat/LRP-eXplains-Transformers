@@ -4,7 +4,7 @@
 </div>
 
 [![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)](https://pytorch.org)
-[![Read the Docs](https://img.shields.io/badge/-Docs-blue?style=for-the-badge&logo=Read-the-Docs&logoColor=white&link=https://inseq.org)](https://google.de)
+[![Read the Docs](https://img.shields.io/badge/-Docs-blue?style=for-the-badge&logo=Read-the-Docs&logoColor=white)](https://lxt.readthedocs.io)
 
 #### 🔥 Faithful Attributions
 
@@ -108,7 +108,7 @@ ViTs are vulnerable to noisy attributions, hence we must denoise the heatmap.
 We propose to use the $\gamma$-LRP rule, where the $\gamma$ parameter must be tuned to the model and dataset!
 
 ## Documentaion
-A documentation of LXT is available, however we will add more in the coming months!
+A [documentation of LXT is available](https://lxt.readthedocs.io), however we will add more in the coming months!
 The Roadmap lists what is still missing.
 
 ## Contribution
