@@ -116,4 +116,4 @@ Feel free to explore the code and experiment with different datasets and models.
 
 
 ## Acknowledgements
-The code is heavily inspired by [Zennit](https://github.com/chr5tphr/zennit), a tool for LRP attributions in PyTorch using hooks. Zennit is 100% compatible wit LXT and offers even more LRP rules 🎉 If you like LXT, consider also liking Zennit ;)
+The code is heavily inspired by [Zennit](https://github.com/chr5tphr/zennit), a tool for LRP attributions in PyTorch using hooks. Zennit is 100% compatible with LXT and offers even more LRP rules 🎉 If you like LXT, consider also liking Zennit ;)

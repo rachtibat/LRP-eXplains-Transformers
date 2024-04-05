@@ -190,7 +190,7 @@ LXT also works for quantized models, however the relevances should be accumulate
 
     # ...
 
-    # this model benefits more then others from explaining the output softmax too
+    # this model benefits more than others from explaining the output softmax too
     output = lf.softmax(output_logits, -1)
 
 
