@@ -2,7 +2,7 @@
 Quickstart
 ==========
 
-Layer-wise Relevance Propagation is a rule-based backpropagation algorithm. This means, that we can implement LRP in a singular backward pass!
+Layer-wise Relevance Propagation is a rule-based backpropagation algorithm. This means, that we can implement LRP in a single backward pass!
 In order to achieve this, we implemented `custom PyTorch autograd Functions <https://pytorch.org/tutorials/beginner/examples_autograd/two_layer_net_custom_function.html>`_ for commonly used operations in transformers. These functions behave identically in the forward pass, but compute LRP attributions in the backward pass. 
 
 To understand how LXT works under the hood, you can read :ref:`under_the_hood`.

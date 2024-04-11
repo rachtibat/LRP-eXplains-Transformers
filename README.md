@@ -58,7 +58,7 @@ $ pip install ./lxt
 Tested with ``transformers==4.39.3``, ``torch==2.2.2``, ``python==3.11``
 
 ### 💡 How does the code work?
-Layer-wise Relevance Propagation is a rule-based backpropagation algorithm. This means, that we can implement LRP in a singular backward pass!
+Layer-wise Relevance Propagation is a rule-based backpropagation algorithm. This means, that we can implement LRP in a single backward pass!
 To achieve this, we have implemented [custom PyTorch autograd Functions](https://pytorch.org/tutorials/beginner/examples_autograd/two_layer_net_custom_function.html) for commonly used operations in transformers. These functions behave identically in the forward pass, but compute LRP attributions in the backward pass. To compute the $\varepsilon$-LRP rule for a linear function $y = W x + b$, you can simply write
 ```python
 import lxt.functional as lf
