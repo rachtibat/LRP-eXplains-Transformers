@@ -1,9 +1,10 @@
 import pytest
 import torch
 import lxt.rules as rules
-import lxt.functional as functional
+import lxt.functional as lf
 from torch.nn import functional as F
 import torch.nn as nn
+from functools import partial
 
 def test_epsilon_rule():
 
@@ -13,10 +14,11 @@ def test_epsilon_rule():
 
     init_relevance = torch.randn(1, 5, requires_grad=True)
 
-    y_gt = functional.linear_epsilon.apply(x, weights, bias)
+    y_gt = lf.linear_epsilon(x, weights, bias)
     relevance_gt, = torch.autograd.grad(y_gt, x, init_relevance)
 
-    y_lxt = rules.EpsilonRule.apply(F.linear, x, weights, bias)
+    layer = rules.EpsilonRule(partial(F.linear, weight=weights, bias=bias))
+    y_lxt = layer(x)
     relevance_lxt, = torch.autograd.grad(y_lxt, x, init_relevance)
 
     assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-5)
