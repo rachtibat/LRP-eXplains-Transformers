@@ -41,6 +41,15 @@ class RMSNormIdentity(nn.Module):
         return lf.rms_norm_identity_fn.apply(hidden_states, self.weight, self.variance_epsilon)
     
 
+class LayerNormEpsilon(nn.LayerNorm):
+
+    def __init__(self, normalized_shape, eps: float = 0.00001, elementwise_affine: bool = True, bias: bool = True, device=None, dtype=None):
+        super().__init__(normalized_shape, eps, elementwise_affine, bias, device, dtype)
+
+    def forward(self, x):
+        return lf.layer_norm(x, self.weight, self.bias, self.eps)
+    
+
 
 ##########################
 ### Initialize Modules ###
@@ -74,7 +83,7 @@ def initialize_generic(original, replacement):
     return replacement
 
 
-def initialize_linear(original, replacement):
+def initialize_bias(original, replacement):
     """
     Initialize the LinearEpsilon module correctly with the bias argument.
     """
@@ -94,6 +103,7 @@ def initialize_linear(original, replacement):
 
 INIT_MODULE_MAPPING = {
     SoftmaxDT: initialize_generic,
-    LinearEpsilon: initialize_linear,
-    RMSNormIdentity: initialize_generic
+    LinearEpsilon: initialize_bias,
+    RMSNormIdentity: initialize_generic,
+    LayerNormEpsilon: initialize_bias
 }
