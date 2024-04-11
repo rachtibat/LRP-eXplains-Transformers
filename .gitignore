@@ -1,3 +1,6 @@
+# lxt specific
+tests/benchmark.py
+
 # PyPI upload script
 upload_pip.sh
 
