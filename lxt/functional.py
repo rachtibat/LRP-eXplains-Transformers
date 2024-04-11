@@ -60,7 +60,6 @@ def add2(input_a, input_b, inplace=False, epsilon=1e-6):
     """
     
     return add2_tensors_fn.apply(input_a, input_b, inplace, epsilon)
-    # return add2_fn_OLD.apply(input_a, input_b, inplace, epsilon)
 
 @torch.fx.wrap
 def softmax(input, dim, dtype=None, inplace=False):
@@ -160,6 +159,83 @@ def mul2(input_a, input_b, inplace=False):
     """
     return mul2_fn.apply(input_a, input_b, inplace)
 
+@torch.fx.wrap
+def mean(x, dim, keep_dim, epsilon=1e-6):
+    """
+    Epsilon LRP rule for the mean operation.
+
+    Parameters:
+    -----------
+    x: torch.Tensor
+        The input tensor
+    dim: int
+        The dimension to apply the mean function
+    keep_dim: bool
+        Whether to keep the dimension after applying the mean function
+    epsilon: float
+        Small value to stabilize the denominator
+    """
+    
+    return mean_fn.apply(x, dim, keep_dim, epsilon)
+
+@torch.fx.wrap
+def layer_norm(hidden_states, weight, bias, variance_epsilon):
+    """
+    A mixture of identity and epsilon rules for standard nn.LayerNorm operations:
+    Idenitiy rule for element-wise (y * weight) because single input single output. Identity rule on 1/std because of Proposition 3.4 of the paper
+    'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'. 
+    (x - mean) is a linear operation, so we apply the epsilon rule on it.
+
+    To implement this, we do a trick: We differentiate the whole layer, while detaching the std operation from the graph.
+    This is then equivalent to all the rules discussed above! This is slightly faster than implementing everything in pure lxt.
+    See _layer_norm_slower for the pure lxt implementation.
+
+    Parameters:
+    -----------
+    hidden_states: torch.Tensor
+        The input tensor
+    weight: torch.Tensor
+        The weight tensor
+    variance_epsilon: float
+        Small value to stabilize the denominator
+    """
+
+    return layer_norm_grad_fn.apply(hidden_states, weight, bias, variance_epsilon)
+
+@torch.fx.wrap
+def _layer_norm_slower(hidden_states, weight, bias, variance_epsilon):
+    """
+    A mixture of identity and epsilon rules for standard nn.LayerNorm operations:
+    Idenitiy rule for element-wise (y * weight) because single input single output. Identity rule on 1/std because of Proposition 3.4 of the paper
+    'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'. 
+    (x - mean) is a linear operation, so we apply the epsilon rule on it.
+
+    This implementation is slower than the layer_norm function because it is implemented in pure lxt instead of using torch.autograd.
+
+    Parameters:
+    -----------
+    hidden_states: torch.Tensor
+        The input tensor
+    weight: torch.Tensor
+        The weight tensor
+    variance_epsilon: float
+        Small value to stabilize the denominator
+    """
+
+    
+    x_mean = mean(hidden_states, -1, keep_dim=True)
+
+    # no relevance will flow through std because we detach!
+    var = ((hidden_states - x_mean) ** 2).mean(dim=-1, keepdim=True)
+    std = (var + variance_epsilon).sqrt().detach()
+    
+    y = add2(hidden_states, mul2(x_mean, -1))
+    # mul2 is identity if the second input does not require gradients
+    y = mul2(y, 1/std)
+    y = mul2(y, weight)
+    y = add2(y, bias)
+
+    return y
 
 ###############################
 ### AUTOGRAD IMPLEMENTATION ###
@@ -431,3 +507,102 @@ class mul2_fn(Function):
 
         # only return relevance at requires_grad indices else None
         return tuple(out_relevance if i in ctx.requires_grads else None for i in range(2)) + (None,)
+
+
+class mean_fn(Function):
+    """
+    Epsilon LRP rule for the mean operation.
+
+    Parameters:
+    -----------
+    x: torch.Tensor
+        The input tensor
+    dim: int
+        The dimension to apply the mean function
+    keep_dim: bool
+        Whether to keep the dimension after applying the mean function
+    epsilon: float
+        Small value to stabilize the denominator
+    """
+
+    @staticmethod
+    def forward(ctx, x, dim, keepdim, epsilon=1e-6):
+
+        y = x.mean(dim, keepdim)
+    
+        ctx.save_for_backward(x)
+        ctx.epsilon, ctx.dim, ctx.keepdim = epsilon, dim, keepdim
+
+        return y
+
+    @staticmethod
+    @conservation_check_wrap
+    def backward(ctx, *out_relevance):
+
+        x, = ctx.saved_tensors
+
+        x_sum = x.sum(ctx.dim, keepdim=True)
+
+        if ctx.keepdim is False:
+            out_relevance = out_relevance[0].unsqueeze(ctx.dim)
+        else:
+            out_relevance = out_relevance[0]
+
+        relevance = x * out_relevance / _stabilize(x_sum, ctx.epsilon, inplace=True)
+
+        if ctx.keepdim is False:
+            relevance = relevance.squeeze(ctx.dim)
+
+        return (relevance, None, None, None)
+    
+
+class layer_norm_grad_fn(Function):
+    """
+    A mixture of identity and epsilon rules for standard nn.LayerNorm operations:
+    Idenitiy rule for element-wise (y * weight) because single input single output. Identity rule on 1/std because of Proposition 3.4 of the paper
+    'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'. 
+    (x - mean) is a linear operation, so we apply the epsilon rule on it.
+
+    To implement this, we do a trick: We differentiate the whole layer, while detaching the std operation from the graph.
+    This is then equivalent to all the rules discussed above! This is slightly faster than implementing everything in pure lxt.
+
+    Parameters:
+    -----------
+    hidden_states: torch.Tensor
+        The input tensor
+    weight: torch.Tensor
+        The weight tensor
+    variance_epsilon: float
+        Small value to stabilize the denominator
+    """
+
+    @staticmethod
+    def forward(ctx, x, weight, bias, variance_epsilon, epsilon=1e-6):
+
+        with torch.enable_grad():
+
+            mean = x.mean(dim=-1, keepdim=True)
+            var = ((x - mean) ** 2).mean(dim=-1, keepdim=True)
+            std = (var + variance_epsilon).sqrt()
+            y = (x - mean) / std.detach() # detach std operation will remove it from computational graph i.e. identity rule on x/std
+            if weight is not None:
+                y *= weight
+            if bias is not None:
+                y += bias
+
+            ctx.save_for_backward(x, y)
+            ctx.epsilon = epsilon
+
+        return y.detach()
+
+    @staticmethod
+    @conservation_check_wrap
+    def backward(ctx, *out_relevance):
+
+        x, y = ctx.saved_tensors
+
+        relevance_norm = out_relevance[0] / _stabilize(y, ctx.epsilon, False)
+
+        grads, = torch.autograd.grad(y, x, relevance_norm)
+
+        return (grads*x, None, None, None, None)
