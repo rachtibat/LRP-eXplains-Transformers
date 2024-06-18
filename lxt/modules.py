@@ -38,7 +38,7 @@ class RMSNormIdentity(nn.Module):
         self.variance_epsilon = eps
 
     def forward(self, hidden_states):
-        return lf.rms_norm_identity_fn.apply(hidden_states, self.weight, self.variance_epsilon)
+        return lf.rms_norm_identity(hidden_states, self.weight, self.variance_epsilon)
     
 
 class LayerNormEpsilon(nn.LayerNorm):
