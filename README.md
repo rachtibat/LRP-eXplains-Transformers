@@ -51,8 +51,8 @@ $ pip install lxt
 To reproduce the experiments from the paper, install from a manually cloned repository: 
 
 ```shell
-$ git clone https://github.com/rachtibat/LRP-for-Transformers
-$ pip install ./lxt
+$ git clone https://github.com/rachtibat/LRP-eXplains-Transformers
+$ pip install ./LRP-eXplains-Transformers
 ```
 
 Tested with ``transformers==4.39.3``, ``torch==2.2.2``, ``python==3.11``
