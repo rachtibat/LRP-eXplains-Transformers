@@ -1,5 +1,6 @@
-import torch
 import operator
+import torch
+import torch.nn as nn
 from lxt.functional import CONSERVATION_CHECK_FLAG
 
 class conservation_check(object):
@@ -24,6 +25,18 @@ WHITELIST = [
     "view",
     "unsqueeze",
     "reshape",
+    "permute",
+    "size",
+    "dim",
+    "expand",
+    "to",
+    "argmax",
+
+    operator.getitem,
+    torch._assert,
+    operator.eq,
+    torch.cat,
+
 
 ]
 
@@ -38,6 +51,8 @@ BLACKLIST = [
     "mul",
     operator.mul,
 
+    operator.floordiv,
+
     "mean",
     torch.mean,
 
@@ -46,4 +61,6 @@ BLACKLIST = [
 
     "softmax",
     torch.softmax,
+
+    "exp",
 ]
