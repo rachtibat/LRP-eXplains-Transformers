@@ -142,7 +142,7 @@ def test_layernorm():
     layer.weight.requires_grad_(False)
     layer.bias.requires_grad_(False)
 
-    ### round truth
+    ### ground truth
     y = lf.layer_norm(x, weight, bias, layer.eps)
     relevance_gt, = torch.autograd.grad(y, x, init_relevance)
 
@@ -153,6 +153,24 @@ def test_layernorm():
     assert torch.allclose(relevance_lxt, relevance_gt, rtol=0, atol=1e-3)
 
 
+def test_normalize():
+
+    x = torch.randn(1, 4, 32, requires_grad=True)
+    r_gt = torch.randn(1, 4, 32)
+
+    weight, variance_epsilon = torch.randn(32), 1e-9
+    y = lf.rms_norm_identity(x, weight, variance_epsilon)
+    y.backward(r_gt)
+
+    assert torch.allclose(x.grad, r_gt, rtol=0, atol=1e-5)
+    x.grad.zero_()
+
+    y = lf.normalize(x, p=2, dim=1)
+    y.backward(r_gt)
+
+    assert torch.allclose(x.grad, r_gt, rtol=0, atol=1e-5)
+
+
 if __name__ == "__main__":
 
     test_softmax()
@@ -161,5 +179,6 @@ if __name__ == "__main__":
     test_sum()
     test_mean()
     test_layernorm()
+    test_normalize()
 
     print("ALL TESTS PASSED")
