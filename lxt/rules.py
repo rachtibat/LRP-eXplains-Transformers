@@ -3,7 +3,7 @@ from torch.autograd import Function
 import torch.nn as nn
 from lxt.functional import _stabilize, conservation_check_wrap
 from torch.func import jvp, vjp
-
+import torch.fx
 
 class WrapModule(nn.Module):
     """
@@ -35,7 +35,7 @@ class IdentityRule(WrapModule):
         return identity_fn.apply(self.module, input)
     
 
-def identity(fn, x):
+def identity(fn, input):
     """
     Distribute the relevance 100% to the input according to the identity rule in Equation 9 of the paper:
     AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers
@@ -48,7 +48,7 @@ def identity(fn, x):
     input: torch.Tensor
         The input tensor
     """
-    return identity_fn.apply(fn, x)
+    return identity_fn.apply(fn, input)
 
 
 class identity_fn(Function):
@@ -138,7 +138,7 @@ class EpsilonRule(WrapModule):
 
     """
 
-    def __init__(self, module, epsilon=1e-6):
+    def __init__(self, module, epsilon=1e-8):
         
         super(EpsilonRule, self).__init__(module)
         self.epsilon = epsilon
@@ -147,6 +147,24 @@ class EpsilonRule(WrapModule):
 
         return epsilon_lrp_fn.apply(self.module, self.epsilon, *inputs)
 
+@torch.fx.wrap
+def epsilon_lrp(fn, epsilon, *inputs):
+    """
+    Gradient X Input (Taylor Decomposition with bias or standard Epsilon-LRP rule for linear layers) according to the Equation 4-5 and 8 of the paper:
+    AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers
+
+    If one of the inputs is a constant or does not require gradients, no relevance is distributed to it.
+
+    Parameters:
+    -----------
+    fn: callable
+        The function to be called with the inputs, must be differentiable in PyTorch
+    epsilon: float
+        Small value to stabilize the denominator
+    *inputs: at least one torch.Tensor
+        The input tensors to the function
+    """
+    return epsilon_lrp_fn.apply(fn, epsilon, *inputs)
 
 
 class epsilon_lrp_fn(Function):
@@ -170,6 +188,7 @@ class epsilon_lrp_fn(Function):
     def forward(ctx, fn, epsilon, *inputs):
 
         # create boolean mask for inputs requiring gradients
+        #TODO: use ctx.needs_input_grad instead of requires_grad
         requires_grads = [True if inp.requires_grad else False for inp in inputs]
         if sum(requires_grads) == 0:
             # no gradients to compute or gradient checkpointing is used
@@ -199,7 +218,8 @@ class epsilon_lrp_fn(Function):
         grads = torch.autograd.grad(outputs, inputs, relevance_norm)
 
         # return relevance at requires_grad indices else None
-        return (None, None) + tuple(grads[i].mul_(inputs[i]) if ctx.requires_grads[i] else None for i in range(len(ctx.requires_grads)))
+        relevance = iter([grads[i].mul_(inputs[i]) for i in range(len(inputs))])
+        return (None, None) + tuple(next(relevance) if req_grad else None for req_grad in ctx.requires_grads)
 
         
     
