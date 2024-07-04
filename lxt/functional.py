@@ -3,7 +3,6 @@ import torch.fx
 from torch.autograd import Function
 import torch.nn.functional as F
 
-
 ####################
 ### Sanity Check ###
 ####################
@@ -42,7 +41,7 @@ def conservation_check_wrap(func):
 #####################
 
 @torch.fx.wrap
-def add2(input_a, input_b, inplace=False, epsilon=1e-6):
+def add2(input_a, input_b, inplace=False, epsilon=1e-8):
     """
     Standard Epsilon-LRP rule for elementwise addition (along all dimensions) of two tensors according to the Equation 8 of the paper
     'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'
@@ -58,7 +57,6 @@ def add2(input_a, input_b, inplace=False, epsilon=1e-6):
     epsilon: float
         Small value to stabilize the denominator
     """
-    
     return add2_tensors_fn.apply(input_a, input_b, inplace, epsilon)
 
 @torch.fx.wrap
@@ -102,7 +100,7 @@ def linear_epsilon(input, weight, bias=None, epsilon=1e-6):
     return linear_epsilon_fn.apply(input, weight, bias, epsilon)
 
 @torch.fx.wrap
-def matmul(input_a, input_b, inplace=False, epsilon=1e-6):
+def matmul(input_a, input_b, inplace=False, epsilon=1e-8):
     """
     Computes relevance by sequential application of the epsilon- and uniform-LRP rule according to Proposition 3.3 of the paper
     'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'
@@ -236,6 +234,30 @@ def _layer_norm_slower(hidden_states, weight, bias, variance_epsilon):
     y = add2(y, bias)
 
     return y
+
+
+@torch.fx.wrap
+def normalize(input, p= 2.0, dim= 1, eps= 1e-12, out=None):
+    """
+    Applies the identity rule on the torch.nn.functional.normalize operation according to Proposition 3.4 of the paper
+    'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'
+
+
+    Parameters:
+    -----------
+    input: torch.Tensor
+        The input tensor
+    p: float
+        The power for the norm computation
+    dim: int
+        The dimension to apply the normalization
+    eps: float
+        Small value to stabilize the denominator
+    """
+
+    assert out is None, "out parameter is not supported"
+    
+    return normalize_identity_fn.apply(input, p, dim, eps)
 
 ###############################
 ### AUTOGRAD IMPLEMENTATION ###
@@ -606,3 +628,33 @@ class layer_norm_grad_fn(Function):
         grads, = torch.autograd.grad(y, x, relevance_norm)
 
         return (grads*x, None, None, None, None)
+
+
+class normalize_identity_fn(Function):
+    """
+    Applies the identity rule on the torch.nn.functional.normalize operation according to Proposition 3.4 of the paper
+    'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'
+
+
+    Parameters:
+    -----------
+    input: torch.Tensor
+        The input tensor
+    p: float
+        The power for the norm computation
+    dim: int
+        The dimension to apply the normalization
+    eps: float
+        Small value to stabilize the denominator
+    """
+
+    @staticmethod
+    def forward(ctx, input, p, dim, eps):
+
+        return F.normalize(input, p=p, dim=dim, eps=eps)
+
+    @staticmethod
+    @conservation_check_wrap
+    def backward(ctx, *out_relevance):
+
+        return out_relevance + (None, None, None)
