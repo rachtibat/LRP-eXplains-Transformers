@@ -86,7 +86,7 @@ class Composite:
                 print("-> register ZENNIT composite", self.zennit_composite)
             self.zennit_composite.register(parent)
 
-        if verbose:
+        if verbose and (fn_map or dummy_inputs):
             self.print_summary()
 
         return parent
@@ -113,7 +113,7 @@ class Composite:
 
         for name, child in parent.named_children():
 
-            self._attach_module_rule(child, parent, name, rule_dict)
+            child = self._attach_module_rule(child, parent, name, rule_dict)
             self._iterate_children(child, rule_dict)
 
     def _attach_module_rule(self, child, parent, name, rule_dict):
@@ -135,6 +135,8 @@ class Composite:
                     # replace module with LXT.module and attach it to parent as attribute
                     # INIT_MODULE_MAPPING contains the correct function for initializing and copying the parameters and buffers
                     xai_module = INIT_MODULE_MAPPING[rule](child, rule)
+                    # return the new module to iterate through its children to attach the rules
+                    child = xai_module
                 else:
                     raise ValueError(f"Rule {rule} must be a subclass of WrapModule or a torch.nn.Module")
 
@@ -143,11 +145,11 @@ class Composite:
                 # save original module to revert the composite in self.remove()
                 self.original_modules.append((parent, name, child))
 
-                return True
+                return child
         
         # could not find a rule for the module
 
-        return False
+        return child
 
 
     def _iterate_graph(self, model, dummy_inputs, fn_map, module_map, tracer=HFTracer):
@@ -285,7 +287,7 @@ class Composite:
         if "nn_module_stack" in node.meta:
             module_name = list(node.meta["nn_module_stack"].values())[-1]
         else:
-            module_name = "None"
+            module_name = "Root"
 
         if module_name not in self.function_summary:
             self.function_summary[module_name] = {}
@@ -337,7 +339,10 @@ class Composite:
     def remove(self):
         """
         Remove the composite from the model and revert the original modules.
+        #TODO: in-depth explanation
         """
+
+        warn("This functionality is not yet fully tested. Please check the model after removing the composite.")
 
         if self.function_summary:
             warn("Some functions have been replaced by tracing the model with torch.fx. You can't reverse function replacements, but only nn.Module and Zennit replacements.")
