@@ -117,7 +117,6 @@ To revert the modification, simply write
 and you should see in the terminal that the rules are removed. 
 (This only works if the model was not symbolically traced as explained later. There will be a warning message if something went wrong.)
 
-
 torch.fx Graph Manipulation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -165,9 +164,9 @@ To use ``torch.fx``, you must supply a dummy input
       })
 
       x = torch.randn(1, 32, 10, requires_grad=True)
-      model = lrp.register(model, dummy_inputs={'x': x}, verbose=True)
+      traced = lrp.register(model, dummy_inputs={'x': x}, verbose=True)
 
-      print(model)
+      print(traced)
 
 You can not remove composites from traced models i.e. ``lrp.remove()`` will not work!
 (You will see a warning message)

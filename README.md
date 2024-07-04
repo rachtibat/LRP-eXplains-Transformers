@@ -31,7 +31,8 @@ This project is licensed under the BSD-3 Clause License, which means that LRP is
 ⚠️ Because of the high community interest, we release a first version of LXT that might change in the future.
 
 - [x] LRP for LLMs
-- [ ] LRP for ViTs
+- [x] LRP for ViTs
+- [ ] Enable Graph Tracing for Gradient Checkpointing
 - [ ] Latent Feature Visualization
 - [ ] Perturbation Evaluation
 - [ ] Tests
@@ -92,7 +93,7 @@ print(model)
 </div>
 
 
-### 🚀 Quickstart with 🤗 (Tiny)LLaMA 2, T5 or Mixtral 8x7b
+### 🚀 Quickstart with 🤗 (Tiny)LLaMA 2/3, CLIP ViT or Mixtral 8x7b
 For a quick demo, we provide modified huggingface source code of popular LLMs, where we already replaced all operations with their equivalent LXT variant.
 
 

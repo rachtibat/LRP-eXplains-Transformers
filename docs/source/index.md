@@ -16,7 +16,7 @@ Attention-aware LRP (AttnLRP) **outperforms** gradient- and perturbation-based m
 :::{card} 🚀 Quickstart
 :link: quickstart
 :link-type: ref
-Examples for 🤗 (Tiny)LLaMA 2, T5 and Mixtral 8x7b
+Examples for 🤗 (Tiny)LLaMA 3/2, Mixtral 8x7b, CLIP ViT
 :::
 
 :::{card} 💡 LXT Drop-In Replacements
