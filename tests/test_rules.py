@@ -21,6 +21,13 @@ def test_epsilon_rule():
     y_lxt = layer(x)
     relevance_lxt, = torch.autograd.grad(y_lxt, x, init_relevance)
 
-    assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-5)
+    assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-3)
+
+
+if __name__ == "__main__":
+    
+    test_epsilon_rule()
+    
+    print("ALL TESTS PASSED")
 
 

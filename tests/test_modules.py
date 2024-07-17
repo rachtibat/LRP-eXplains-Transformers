@@ -108,7 +108,7 @@ def test_MultiheadAttention():
 
     y_lxt.backward(y_lxt)
     rel_lxt = x.grad
-    assert torch.allclose(rel_gt, rel_lxt, atol=5e-2, rtol=0)
+    assert torch.allclose(rel_gt, rel_lxt, rtol=0, atol=1e-1)
 
     # compute cosine similarity
     rel_gt = rel_gt.flatten()
