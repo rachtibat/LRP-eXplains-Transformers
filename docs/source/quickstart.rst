@@ -130,7 +130,9 @@ TinyLLaMA is a `very small open-source model <https://github.com/jzhang38/TinyLl
 
 
 Generally, the contrast in the heatmap is further strengthened if the softmax output is also explained.
-However, we didn't explore this in our paper.
+For that, we have a temperature hyperparameter in the softmax that should be set to a value greater than 1 to prevent
+that the softmax is too confident and hence the gradient vanishes (more details in the paper, Appendix A.2.4). 
+However, we didn't explore this in our experiments.
 
 .. code-block:: python
 
@@ -139,7 +141,7 @@ However, we didn't explore this in our paper.
     # ...
 
     output_logits = model(inputs_embeds=input_embeds.requires_grad_(), use_cache=False).logits
-    output = lf.softmax(output_logits, -1)
+    output = lf.softmax(output_logits, -1, temperature=2)
     max_logits, max_indices = torch.max(output[0, -1, :], dim=-1)
 
     max_logits.backward(max_logits)

@@ -12,12 +12,14 @@ import torch.fx
 
 class SoftmaxDT(nn.Softmax):
 
-    def __init__(self, dim: int, inplace=False, **kwargs):
+    def __init__(self, dim: int, dtype=None, temperature=1.0, inplace=False, **kwargs):
         super().__init__(dim)
         self.inplace = inplace
+        self.dtype = dtype
+        self.temperature = temperature
 
     def forward(self, inputs):
-        return lf.softmax(inputs, self.dim, None, self.inplace)
+        return lf.softmax(inputs, self.dim, self.dtype, self.temperature, self.inplace)
 
 
 class LinearEpsilon(nn.Linear):

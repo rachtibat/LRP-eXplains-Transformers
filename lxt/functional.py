@@ -60,7 +60,7 @@ def add2(input_a, input_b, inplace=False, epsilon=1e-8):
     return add2_tensors_fn.apply(input_a, input_b, inplace, epsilon)
 
 @torch.fx.wrap
-def softmax(input, dim, dtype=None, inplace=False):
+def softmax(input, dim, dtype=None, temperature=1.0, inplace=False):
     """
     Computes Relevance using Deep Taylor Decomposition at x (with bias) according to Proposition 3.1 of the paper
     'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'
@@ -76,7 +76,7 @@ def softmax(input, dim, dtype=None, inplace=False):
     inplace: bool
         Whether to perform the operation in place during the backward pass, will overwrite the relevance at the output
     """
-    return softmax_fn.apply(input, dim, dtype, inplace)
+    return softmax_fn.apply(input, dim, dtype, temperature, inplace)
 
 @torch.fx.wrap
 def linear_epsilon(input, weight, bias=None, epsilon=1e-6):
@@ -291,10 +291,12 @@ class softmax_fn(Function):
     """
 
     @staticmethod
-    def forward(ctx, inputs, dim, dtype=None, inplace=False):
+    def forward(ctx, inputs, dim, dtype=None, temperature=1.0, inplace=False):
 
         if dtype is not None:
             inputs = inputs.to(dtype)
+
+        inputs = inputs / temperature
     
         outputs = F.softmax(inputs, dim=dim, dtype=dtype)
 
@@ -309,12 +311,15 @@ class softmax_fn(Function):
 
         inputs, output = ctx.saved_tensors
 
+        # replace all -inf (coming from attention masks) with 0 for numerical stability
+        inputs = torch.where(torch.isneginf(inputs), torch.tensor(0).to(inputs), inputs)
+
         if ctx.inplace:
             relevance = (out_relevance[0].sub_(output.mul_(out_relevance[0].sum(-1, keepdim=True)))).mul_(inputs)
         else:
             relevance = inputs * (out_relevance[0] - output * out_relevance[0].sum(-1, keepdim=True))
         
-        return (relevance, None, None, None)
+        return (relevance, None, None, None, None)
 
 
 class linear_epsilon_fn(Function):
