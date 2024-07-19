@@ -14,13 +14,19 @@ Attention-aware LRP (AttnLRP) **outperforms** gradient- and perturbation-based m
 Since we get relevance values for each neuron in the model as a by-product, we know exactly how important each neuron is for the prediction of the model. Combined with Activation Maximization, we can label neurons in LLMs and even steer the generation process of the LLM by activating specialized knowledge neurons in latent space!
 
 #### 📃 Paper
-For understanding the math behind it, take a look at the [paper](https://arxiv.org/abs/2402.05602)!
+For understanding the math behind it, take a look at the [ICML 2024 paper](https://proceedings.mlr.press/v235/achtibat24a.html)!
 ```
-@article{achtibat2024attnlrp,
-  title={AttnLRP: Attention-aware Layer-wise Relevance Propagation for Transformers},
-  author={Achtibat, Reduan and Hatefi, Sayed Mohammad Vakilzadeh and Dreyer, Maximilian and Jain, Aakriti and Wiegand, Thomas and Lapuschkin, Sebastian and Samek, Wojciech},
-  journal={arXiv preprint arXiv:2402.05602},
-  year={2024}
+@InProceedings{pmlr-v235-achtibat24a,
+  title = {{A}ttn{LRP}: Attention-Aware Layer-Wise Relevance Propagation for Transformers},
+  author = {Achtibat, Reduan and Hatefi, Sayed Mohammad Vakilzadeh and Dreyer, Maximilian and Jain, Aakriti and Wiegand, Thomas and Lapuschkin, Sebastian and Samek, Wojciech},
+  booktitle = {Proceedings of the 41st International Conference on Machine Learning},
+  pages = {135--168},
+  year = {2024},
+  editor = {Salakhutdinov, Ruslan and Kolter, Zico and Heller, Katherine and Weller, Adrian and Oliver, Nuria and Scarlett, Jonathan and Berkenkamp, Felix},
+  volume = {235},
+  series = {Proceedings of Machine Learning Research},
+  month = {21--27 Jul},
+  publisher = {PMLR}
 }
 ```
 
