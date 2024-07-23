@@ -6,7 +6,6 @@ import torch.nn as nn
 
 
 def test_softmax():
-
     x = torch.randn(16, 10, 32, requires_grad=True)
     init_relevance = torch.randn(16, 10, 32, requires_grad=True)
 
@@ -27,7 +26,6 @@ def test_softmax():
 
 
 def test_matmul():
-
     epsilon = 1e-9
 
     a = torch.randn(2, 10, 32, requires_grad=True)
@@ -38,8 +36,8 @@ def test_matmul():
     y_gt = torch.matmul(a, b)
 
     # implement Proposition 3.3 of AttnLRP paper
-    relevance_a_gt = torch.einsum("bji, bip, bjp -> bji", a, b, init_relevance / (2*y_gt + epsilon))
-    relevance_b_gt = torch.einsum("bji, bip, bjp -> bip", a, b, init_relevance / (2*y_gt + epsilon))
+    relevance_a_gt = torch.einsum("bji, bip, bjp -> bji", a, b, init_relevance / (2 * y_gt + epsilon))
+    relevance_b_gt = torch.einsum("bji, bip, bjp -> bip", a, b, init_relevance / (2 * y_gt + epsilon))
 
     # test inplace=False
     y_lxt = lf.matmul(a, b, False, epsilon)
@@ -55,7 +53,6 @@ def test_matmul():
 
 
 def test_linear():
-
     epsilon = 1e-9
 
     x = torch.randn(16, 10, requires_grad=True)
@@ -77,7 +74,6 @@ def test_linear():
 
 
 def test_sum():
-
     epsilon = 1e-9
 
     a = torch.randn(16, 10, 32, requires_grad=True)
@@ -107,7 +103,6 @@ def test_sum():
 
 
 def test_mean():
-
     epsilon = 1e-9
 
     a = torch.randn(1, 8, 32, requires_grad=True)
@@ -130,7 +125,6 @@ def test_mean():
 
 
 def test_layernorm():
-
     x = torch.randn(1, 2, 8, requires_grad=True)
     init_relevance = torch.randn(1, 2, 8)
 
@@ -161,7 +155,6 @@ def test_layernorm():
 
 
 def test_normalize():
-
     x = torch.randn(1, 4, 32, requires_grad=True)
     r_gt = torch.randn(1, 4, 32)
 
@@ -178,8 +171,63 @@ def test_normalize():
     assert torch.allclose(x.grad, r_gt, rtol=0, atol=1e-5)
 
 
-if __name__ == "__main__":
+def test_conv1d():
+    epsilon = 1e-9
 
+    x = torch.randn(2, 8, 10, requires_grad=True)
+    bias = torch.randn(5, requires_grad=False)
+    weight = torch.randn(10, 5, requires_grad=True)
+
+    init_relevance = torch.randn(2, 8, 5, requires_grad=True)
+
+    size_out = x.size()[:-1] + (5,)
+    out = x.view(-1, x.size(-1)) @ weight + bias
+    y_gt = out.view(*size_out)
+
+    # implement Equation 8 of AttnLRP paper
+    relevace_gt = torch.einsum("ij, bi, bj -> bi", weight, x.view(-1, x.size(-1)),
+                               (init_relevance / (y_gt + epsilon)).view(-1, init_relevance.size(-1)))
+    relevace_gt = relevace_gt.view(x.size())
+
+    y_lxt = lf.conv1d_epsilon(x, weight, bias, epsilon)
+    relevance_lxt, = torch.autograd.grad(y_lxt, x, init_relevance)
+
+    assert torch.allclose(relevace_gt, relevance_lxt, rtol=0, atol=1e-3)
+
+
+def test_baddbmm():
+    epsilon = 1e-9
+
+    a = torch.randn(2, 10, 32, requires_grad=True)
+    b = torch.randn(2, 32, 5, requires_grad=True)
+    c = torch.randn(2, 10, 5, requires_grad=True)
+    alpha, beta = 0.3, 0.7
+
+    init_relevance = torch.randn(2, 10, 5, requires_grad=True)
+
+    y_gt = torch.baddbmm(c, a, b, alpha=alpha, beta=beta, )
+
+    # implement Proposition 3.3 of AttnLRP paper
+    relevance_a_gt = alpha * torch.einsum("bji, bip, bjp -> bji", a, b, init_relevance / (2 * y_gt + epsilon))
+    relevance_b_gt = alpha * torch.einsum("bji, bip, bjp -> bip", a, b, init_relevance / (2 * y_gt + epsilon))
+    relevance_c_gt = init_relevance / (2 * y_gt + epsilon) * beta
+
+    # test inplace=False
+    y_lxt = lf.baddbmm(c, a, b, False, alpha=alpha, beta=beta, epsilon=epsilon)
+    relevance_a_lxt, relevance_b_lxt, relevance_c_lxt = torch.autograd.grad(y_lxt, (a, b, c), init_relevance)
+    assert torch.allclose(relevance_a_gt, relevance_a_lxt, rtol=0, atol=1e-4)
+    assert torch.allclose(relevance_b_gt, relevance_b_lxt, rtol=0, atol=1e-4)
+    assert torch.allclose(relevance_c_gt, relevance_c_lxt, rtol=0, atol=1e-4)
+
+    # test inplace=True
+    y_lxt = lf.baddbmm(c, a, b, True, alpha=alpha, beta=beta, epsilon=epsilon)
+    relevance_a_lxt, relevance_b_lxt, relevance_c_lxt = torch.autograd.grad(y_lxt, (a, b, c), init_relevance)
+    assert torch.allclose(relevance_a_gt, relevance_a_lxt, rtol=0, atol=1e-4)
+    assert torch.allclose(relevance_b_gt, relevance_b_lxt, rtol=0, atol=1e-4)
+    assert torch.allclose(relevance_c_gt, relevance_c_lxt, rtol=0, atol=1e-4)
+
+
+if __name__ == "__main__":
     test_softmax()
     test_matmul()
     test_linear()
@@ -187,5 +235,7 @@ if __name__ == "__main__":
     test_mean()
     test_layernorm()
     test_normalize()
+    test_baddbmm()
+    test_conv1d()
 
     print("ALL TESTS PASSED")

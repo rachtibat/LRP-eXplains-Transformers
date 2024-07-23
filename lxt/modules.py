@@ -4,6 +4,7 @@ import inspect
 import lxt.functional as lf
 import lxt.special as ls
 import torch.fx
+from transformers.pytorch_utils import Conv1D as GPTConv1D
 
 
 ###################
@@ -30,7 +31,24 @@ class LinearEpsilon(nn.Linear):
 
     def forward(self, inputs):
         return lf.linear_epsilon(inputs, self.weight, self.bias, self.epsilon)
-    
+
+class Conv1DEpsilon(GPTConv1D):
+    """
+    1D-convolutional layer as defined by Radford et al. for OpenAI GPT (and also used in GPT-2).
+
+    Basically works like a linear layer but the weights are transposed.
+
+    Args:
+        nf (`int`): The number of output features.
+        nx (`int`): The number of input features.
+    """
+
+    def __init__(self, nf, nx, epsilon=1e-6, **kwargs):
+        super().__init__(nf, nx)
+        self.epsilon = epsilon
+
+    def forward(self, x):
+        return lf.conv1d_epsilon(x, self.weight, self.bias, self.epsilon)
 
 class RMSNormIdentity(nn.Module):
     def __init__(self, hidden_size, eps=1e-6):
