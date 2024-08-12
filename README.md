@@ -62,7 +62,7 @@ $ git clone https://github.com/rachtibat/LRP-eXplains-Transformers
 $ pip install ./LRP-eXplains-Transformers
 ```
 
-Tested with ``transformers==4.39.3``, ``torch==2.2.2``, ``python==3.11``
+Tested with ``transformers==4.44.0``, ``torch==2.1.0``, ``python==3.11``
 
 ### 💡 How does the code work?
 Layer-wise Relevance Propagation is a rule-based backpropagation algorithm. This means, that we can implement LRP in a single backward pass!
