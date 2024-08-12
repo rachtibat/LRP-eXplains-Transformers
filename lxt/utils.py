@@ -30,8 +30,8 @@ def _generate_latex(words, relevances, cmap="bwr"):
         rgb = _apply_colormap(relevance, cmap)
         r, g, b = int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255)
 
-        if word.startswith('▁'):
-            word = word.replace('▁', ' ')
+        if word.startswith('▁') or word.startswith('Ġ'):
+            word = word.replace('▁', ' ').replace('Ġ', ' ')
             latex_code += f' \\colorbox[RGB]{{{r},{g},{b}}}{{\\strut {word}}}'
         else:
             latex_code += f'\\colorbox[RGB]{{{r},{g},{b}}}{{\\strut {word}}}'
