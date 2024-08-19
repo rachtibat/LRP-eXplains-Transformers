@@ -31,10 +31,10 @@ Modify your custom source-code
 Modify your code during runtime via LXT Composites and Symbolic Graph Tracing
 :::
 
-:::{card} 🕵️‍♂️ Debugging LXT
-:link: debugging
+:::{card} 🔎 Latent Feature Attribution & Visualization
+:link: latent_feature_attribution
 :link-type: ref
-How to check, if my LXT implementation makes sense?
+Trace the internal reasoning process of a transformer
 :::
 
 ::::
