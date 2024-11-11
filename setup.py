@@ -6,10 +6,10 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='lxt',  
-    version='0.6.0',
+    version='0.6.1',
     install_requires=[
         'torch',
-        'transformers',
+        'transformers>=4.46.2',
         'accelerate',
         'tabulate',
         'matplotlib',
