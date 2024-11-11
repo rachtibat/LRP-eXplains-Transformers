@@ -69,6 +69,8 @@ import lxt.modules as lm
 import lxt.rules as rules
 from lxt.core import Composite
 
+from bitsandbytes.nn import Linear4bit, Linear8bitLt
+
 
 class ProjSiluMultiplication(nn.Module):
     def forward(self, a, b):
@@ -80,18 +82,26 @@ class AttentionValueMatmul(nn.Module):
 
 attnlrp = Composite({
     nn.SiLU: rules.IdentityRule,
+
     ProjSiluMultiplication: rules.UniformRule,
     nn.Softmax: lm.SoftmaxDT,
     AttentionValueMatmul: rules.UniformEpsilonRule,
+
     nn.Linear: rules.EpsilonRule,
+    Linear4bit: rules.EpsilonRule,
+    Linear8bitLt: rules.EpsilonRule,
 })
 
 cp_lrp = Composite({
     nn.SiLU: rules.StopRelevanceRule,
+
     ProjSiluMultiplication: rules.EpsilonRule,
     nn.Softmax: rules.StopRelevanceRule,
     AttentionValueMatmul: rules.EpsilonRule,
+    
     nn.Linear: rules.EpsilonRule,
+    Linear4bit: rules.EpsilonRule,
+    Linear8bitLt: rules.EpsilonRule,
 })
 
 ###############################################################
