@@ -64,7 +64,7 @@ def add2(input_a, input_b, inplace=False, epsilon=1e-8):
 
 
 @torch.fx.wrap
-def baddbmm(input, batch_matrix, batch_vector, inplace=False,beta=1.0, alpha=1.0, epsilon=1e-6):
+def baddbmm(input, batch_matrix, batch_vector, inplace=False, beta=1.0, alpha=1.0, epsilon=1e-6):
     return baddbmm_fn.apply(input, batch_matrix, batch_vector, beta, alpha, inplace,epsilon)
 
 
@@ -544,9 +544,9 @@ class baddbmm_fn(Function):
 
         # Compute the stabilized denominator for relevance normalization
         if inplace:
-            relevance_norm = grad_output.div_(_stabilize(outputs.mul_(2), epsilon, inplace))
+            relevance_norm = grad_output.div_(_stabilize(outputs.mul_(2), epsilon, True))
         else:
-            relevance_norm = grad_output / _stabilize(outputs * 2, epsilon, inplace)
+            relevance_norm = grad_output / _stabilize(outputs * 2, epsilon, True)
 
         # Compute relevances for input, batch1, and batch2
         relevance_input = beta * relevance_norm

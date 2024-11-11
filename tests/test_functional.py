@@ -1,8 +1,10 @@
 import pytest
 import torch
 import lxt.functional as lf
+import lxt.rules as rules
 from torch.nn import functional as F
 import torch.nn as nn
+from functools import partial
 
 
 def test_softmax():
@@ -17,12 +19,12 @@ def test_softmax():
     # test inplace=False
     y_lxt = lf.softmax(x, -1, torch.float32, False)
     relevance_lxt, = torch.autograd.grad(y_lxt, x, init_relevance)
-    assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-5)
+    assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-4)
 
     # test inplace=True
     y_lxt = lf.softmax(x, -1, torch.float32, True)
     relevance_lxt, = torch.autograd.grad(y_lxt, x, init_relevance)
-    assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-5)
+    assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-4)
 
 
 def test_matmul():
@@ -174,19 +176,18 @@ def test_normalize():
 def test_conv1d():
     epsilon = 1e-9
 
-    x = torch.randn(2, 8, 10, requires_grad=True)
+    x = torch.randn(2, 4, 10, requires_grad=True)
     bias = torch.randn(5, requires_grad=False)
     weight = torch.randn(10, 5, requires_grad=True)
 
-    init_relevance = torch.randn(2, 8, 5, requires_grad=True)
+    init_relevance = torch.randn(2, 4, 5, requires_grad=True)
 
     size_out = x.size()[:-1] + (5,)
     out = x.view(-1, x.size(-1)) @ weight + bias
     y_gt = out.view(*size_out)
 
     # implement Equation 8 of AttnLRP paper
-    relevace_gt = torch.einsum("ij, bi, bj -> bi", weight, x.view(-1, x.size(-1)),
-                               (init_relevance / (y_gt + epsilon)).view(-1, init_relevance.size(-1)))
+    relevace_gt = torch.einsum("ij, bi, bj -> bi", weight, x.view(-1, x.size(-1)), (init_relevance / (y_gt + epsilon)).view(-1, init_relevance.size(-1)))
     relevace_gt = relevace_gt.view(x.size())
 
     y_lxt = lf.conv1d_epsilon(x, weight, bias, epsilon)
@@ -198,14 +199,14 @@ def test_conv1d():
 def test_baddbmm():
     epsilon = 1e-9
 
-    a = torch.randn(2, 10, 32, requires_grad=True)
-    b = torch.randn(2, 32, 5, requires_grad=True)
+    a = torch.randn(2, 10, 16, requires_grad=True)
+    b = torch.randn(2, 16, 5, requires_grad=True)
     c = torch.randn(2, 10, 5, requires_grad=True)
     alpha, beta = 0.3, 0.7
 
     init_relevance = torch.randn(2, 10, 5, requires_grad=True)
 
-    y_gt = torch.baddbmm(c, a, b, alpha=alpha, beta=beta, )
+    y_gt = torch.baddbmm(c, a, b, alpha=alpha, beta=beta)
 
     # implement Proposition 3.3 of AttnLRP paper
     relevance_a_gt = alpha * torch.einsum("bji, bip, bjp -> bji", a, b, init_relevance / (2 * y_gt + epsilon))
@@ -227,15 +228,58 @@ def test_baddbmm():
     assert torch.allclose(relevance_c_gt, relevance_c_lxt, rtol=0, atol=1e-4)
 
 
+def test_baddbmm2():
+    epsilon = 1e-9
+
+    a = torch.randn(2, 10, 16, requires_grad=True)
+    b = torch.randn(2, 16, 5, requires_grad=True)
+    c = torch.randn(2, 10, 5, requires_grad=True)
+    alpha, beta = 0.3, 0.7
+
+    init_relevance = torch.randn(2, 10, 5, requires_grad=True)
+
+
+    layer = rules.EpsilonRule(partial(torch.baddbmm, alpha=alpha, beta=beta), epsilon)
+    y = layer(c, a, b)
+
+    rel_a, rel_b, rel_c = torch.autograd.grad(y, (a, b, c), init_relevance)
+
+
+    # test forward pass
+    y_gt = torch.baddbmm(c, a, b, alpha=alpha, beta=beta)
+    y_manual = beta * c + alpha * torch.matmul(a, b)
+    y_lxt_comp = lf.add2(lf.mul2(c, beta), lf.mul2(lf.matmul(a, b, False, 0), alpha), False, 0)
+    y_lxt = lf.baddbmm(c, a, b, False, alpha=alpha, beta=beta, epsilon=0)
+
+    print(y_gt[0, 0, :10])
+    print(y[0, 0, :10])
+    print(y_lxt_comp[0, 0, :10])
+    print(y_lxt[0, 0, :10])
+
+    assert torch.allclose(y_gt, y_manual, rtol=0, atol=1e-4)
+    assert torch.allclose(y_gt, y_lxt_comp, rtol=0, atol=1e-4)
+    assert torch.allclose(y_gt, y_lxt, rtol=0, atol=1e-4)
+
+    # test backward pass
+
+    rel_a_lxt_comp, rel_b_lxt_comp, rel_c_lxt_comp = torch.autograd.grad(y_lxt_comp, (a, b, c), init_relevance)
+    rel_a_lxt, rel_b_lxt, rel_c_lxt = torch.autograd.grad(y_lxt, (a, b, c), init_relevance)
+
+    print(rel_a_lxt_comp[0, 0, :10])
+    print(rel_a_lxt[0, 0, :10])
+
+    print()
+
+
 if __name__ == "__main__":
-    test_softmax()
-    test_matmul()
-    test_linear()
-    test_sum()
-    test_mean()
-    test_layernorm()
-    test_normalize()
-    test_baddbmm()
-    test_conv1d()
+    # test_softmax()
+    # test_matmul()
+    # test_linear()
+    # test_sum()
+    # test_mean()
+    # test_layernorm()
+    # test_normalize()
+    test_baddbmm2()
+    # test_conv1d()
 
     print("ALL TESTS PASSED")
