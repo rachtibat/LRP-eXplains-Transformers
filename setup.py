@@ -8,7 +8,7 @@ setuptools.setup(
     name='lxt',  
     version='0.6.1',
     install_requires=[
-        'torch',
+        'torch<=2.1.0',
         'transformers>=4.46.2',
         'accelerate',
         'tabulate',
