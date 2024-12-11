@@ -850,7 +850,7 @@ class Phi3DecoderLayer(nn.Module):
         super().__init__()
 
         self.config = config
-        self.self_attn = PHI3_ATTENTION_CLASSES[config._attn_implementation](config, layer_idx=layer_idx)
+        self.self_attn = PHI3_ATTENTION_CLASSES["eager"](config, layer_idx=layer_idx)
 
         self.mlp = Phi3MLP(config)
         self.input_layernorm = RMSNormIdentity(config.hidden_size, eps=config.rms_norm_eps)
