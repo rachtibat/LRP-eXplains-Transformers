@@ -1,7 +1,5 @@
 import torch
 from transformers import AutoTokenizer
-from transformers import BitsAndBytesConfig
-
 from lxt.models.qwen2 import Qwen2ForCausalLM, attnlrp
 from transformers import Qwen2Config
 from lxt.utils import pdf_heatmap, clean_tokens
