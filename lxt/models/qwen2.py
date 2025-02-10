@@ -84,7 +84,7 @@ cp_lrp = Composite({
 ###############################################################
 ###############################################################
 ###############################################################
-
+ 
 class Qwen2MLP(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -180,10 +180,8 @@ def eager_attention_forward(
     # attn_output = torch.matmul(attn_weights, value_states)
     # attn_output = attn_output.transpose(1, 2).contiguous()
     
-    softmax = nn.Softmax(dim=-1)
-    attn_value_matmul = AttentionValueMatmul()
-    attn_weights = softmax(attn_weights.float()).to(query.dtype) #### <---- LXT
-    attn_output = attn_value_matmul(attn_weights, value_states)#### <---- LXT
+    attn_weights = module.softmax(attn_weights.float()).to(query.dtype) #### <---- LXT
+    attn_output = module.attn_value_matmul(attn_weights, value_states) #### <---- LXT
     attn_output = attn_output.transpose(1, 2).contiguous()
 
     return attn_output, attn_weights
@@ -205,6 +203,9 @@ class Qwen2Attention(nn.Module):
         self.k_proj = nn.Linear(config.hidden_size, config.num_key_value_heads * self.head_dim, bias=True)
         self.v_proj = nn.Linear(config.hidden_size, config.num_key_value_heads * self.head_dim, bias=True)
         self.o_proj = nn.Linear(config.num_attention_heads * self.head_dim, config.hidden_size, bias=False)
+
+        self.softmax = nn.Softmax(dim=-1) #### <---- LXT
+        self.attn_value_matmul = AttentionValueMatmul() #### <---- LXT
 
     def forward(
         self,
@@ -265,24 +266,24 @@ class Qwen2Attention(nn.Module):
         return attn_output, attn_weights
 
 
-class Qwen2RMSNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-6):
-        """
-        Qwen2RMSNorm is equivalent to T5LayerNorm
-        """
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
-        self.variance_epsilon = eps
+# class Qwen2RMSNorm(nn.Module):
+#     def __init__(self, hidden_size, eps=1e-6):
+#         """
+#         Qwen2RMSNorm is equivalent to T5LayerNorm
+#         """
+#         super().__init__()
+#         self.weight = nn.Parameter(torch.ones(hidden_size))
+#         self.variance_epsilon = eps
 
-    def forward(self, hidden_states):
-        input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        return self.weight * hidden_states.to(input_dtype)
+#     def forward(self, hidden_states):
+#         input_dtype = hidden_states.dtype
+#         hidden_states = hidden_states.to(torch.float32)
+#         variance = hidden_states.pow(2).mean(-1, keepdim=True)
+#         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+#         return self.weight * hidden_states.to(input_dtype)
 
-    def extra_repr(self):
-        return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
+#     def extra_repr(self):
+#         return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
 
 
 class Qwen2DecoderLayer(nn.Module):
@@ -291,8 +292,12 @@ class Qwen2DecoderLayer(nn.Module):
         self.hidden_size = config.hidden_size
         self.self_attn = Qwen2Attention(config=config, layer_idx=layer_idx)
         self.mlp = Qwen2MLP(config)
-        self.input_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.post_attention_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+
+        self.input_layernorm = RMSNormIdentity(config.hidden_size, eps=config.rms_norm_eps) #### <---- LXT
+        self.post_attention_layernorm = RMSNormIdentity(config.hidden_size, eps=config.rms_norm_eps) #### <---- LXT
+
+        # self.input_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        # self.post_attention_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         if config.sliding_window and config._attn_implementation != "flash_attention_2":
             logger.warning_once(
                 f"Sliding Window Attention is enabled but not implemented for `{config._attn_implementation}`; "
@@ -549,7 +554,8 @@ class Qwen2Model(Qwen2PreTrainedModel):
         self.layers = nn.ModuleList(
             [Qwen2DecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
-        self.norm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        # self.norm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.norm = RMSNormIdentity(config.hidden_size, eps=config.rms_norm_eps) #### <---- LXT
         self.rotary_emb = Qwen2RotaryEmbedding(config=config)
         self.gradient_checkpointing = False
 

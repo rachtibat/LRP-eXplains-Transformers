@@ -4,7 +4,7 @@ from lxt.models.qwen2 import Qwen2ForCausalLM, attnlrp
 from transformers import Qwen2Config
 from lxt.utils import pdf_heatmap, clean_tokens
 
-path = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+path = "Qwen/Qwen2.5-1.5B-Instruct"
 
 config = Qwen2Config.from_pretrained(path)
 
