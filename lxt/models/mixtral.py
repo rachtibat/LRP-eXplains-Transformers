@@ -509,7 +509,7 @@ class MixtralDecoderLayer(nn.Module):
         super().__init__()
         self.hidden_size = config.hidden_size
 
-        self.self_attn = MISTRAL_ATTENTION_CLASSES[config._attn_implementation](config, layer_idx)
+        self.self_attn = MISTRAL_ATTENTION_CLASSES["eager"](config, layer_idx)
 
         self.block_sparse_moe = MixtralSparseMoeBlock(config)
         self.input_layernorm = RMSNormIdentity(config.hidden_size, eps=config.rms_norm_eps)
