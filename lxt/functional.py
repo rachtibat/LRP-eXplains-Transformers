@@ -64,11 +64,6 @@ def add2(input_a, input_b, inplace=False, epsilon=1e-8):
 
 
 @torch.fx.wrap
-def baddbmm(input, batch_matrix, batch_vector, inplace=False, beta=1.0, alpha=1.0, epsilon=1e-6):
-    return baddbmm_fn.apply(input, batch_matrix, batch_vector, beta, alpha, inplace,epsilon)
-
-
-@torch.fx.wrap
 def softmax(input, dim, dtype=None, temperature=1.0, inplace=False):
     """
     Computes Relevance using Deep Taylor Decomposition at x (with bias) according to Proposition 3.1 of the paper
@@ -128,11 +123,6 @@ def matmul(input_a, input_b, inplace=False, epsilon=1e-8):
         Small value to stabilize the denominator
     """
     return matmul_fn.apply(input_a, input_b, inplace, epsilon)
-
-
-@torch.fx.wrap
-def conv1d_epsilon(input, weight, bias=None, epsilon=1e-6):
-    return conv1d_epsilon_fn.apply(input, weight, bias, epsilon)
 
 
 @torch.fx.wrap
@@ -278,6 +268,32 @@ def normalize(input, p=2.0, dim=1, eps=1e-12, out=None):
     assert out is None, "out parameter is not supported"
 
     return normalize_identity_fn.apply(input, p, dim, eps)
+
+
+@torch.fx.wrap
+def baddbmm(input, batch_matrix, batch_vector, beta=1.0, alpha=1.0, inplace=False, epsilon=1e-6):
+    """
+    Computes relevance by sequential application of the epsilon- and uniform-LRP rule according to Proposition 3.3 of the paper
+    'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'
+
+    Parameters:
+    -----------
+    input: torch.Tensor
+        The tensor to which the result of the batched matrix multiplication is added, shape (batch_size, m, n)
+    batch1: torch.Tensor
+        The first input tensor for batched matrix multiplication, shape (batch_size, m, k)
+    batch2: torch.Tensor
+        The second input tensor for batched matrix multiplication, shape (batch_size, k, n)
+    beta: float
+        The scaling factor for the input tensor
+    alpha: float
+        The scaling factor for the result of the batched matrix multiplication
+    inplace: bool
+        Whether to perform the operation in place during the backward pass
+    epsilon: float
+        Small value to stabilize the denominator
+    """
+    return baddbmm_fn.apply(input, batch_matrix, batch_vector, beta, alpha, inplace, epsilon)
 
 
 ###############################
@@ -427,34 +443,6 @@ class matmul_fn(Function):
         return (relevance_a, relevance_b, None, None)
 
 
-class conv1d_epsilon_fn(Function):
-    """
-    Standard Epsilon-LRP rule for nn.functional.conv1d
-    """
-
-    @staticmethod
-    def forward(ctx, inputs, weight, bias=None, epsilon=1e-6):
-        size_out = inputs.size()[:-1] + (weight.shape[-1],)
-        outputs = torch.addmm(bias, inputs.view(-1, inputs.size(-1)), weight)
-        outputs = outputs.view(size_out)
-        ctx.save_for_backward(inputs, weight, outputs)
-        ctx.epsilon = epsilon
-
-        return outputs
-
-    @staticmethod
-    @conservation_check_wrap
-    def backward(ctx, *out_relevance):
-        inputs, weight, outputs = ctx.saved_tensors
-        epsilon = ctx.epsilon
-
-        relevance_norm = out_relevance[0] / _stabilize(outputs, epsilon)
-
-        relevance = torch.matmul(relevance_norm, torch.transpose(weight, -1, -2)).mul_(inputs)
-
-        return (relevance, None, None, None)
-
-
 class add2_tensors_fn(Function):
     """
     Standard Epsilon-LRP rule for elementwise addition (along all dimensions) of two tensors according to the Equation 8 of the paper
@@ -544,14 +532,18 @@ class baddbmm_fn(Function):
 
         # Compute the stabilized denominator for relevance normalization
         if inplace:
-            relevance_norm = grad_output.div_(_stabilize(outputs.mul_(2), epsilon, True))
+            relevance_norm = grad_output.div_(_stabilize(outputs, epsilon, inplace))
         else:
-            relevance_norm = grad_output / _stabilize(outputs * 2, epsilon, True)
+            relevance_norm = grad_output / _stabilize(outputs, epsilon, inplace)
 
         # Compute relevances for input, batch1, and batch2
-        relevance_input = beta * relevance_norm
-        relevance_batch1 = alpha * torch.bmm(relevance_norm, batch2.transpose(1, 2)) * batch1
-        relevance_batch2 = alpha * torch.bmm(batch1.transpose(1, 2), relevance_norm) * batch2
+        relevance_input = beta * input * relevance_norm
+
+        #relevance_a = torch.matmul(relevance_norm, input_b.transpose(-1, -2)).mul_(input_a)
+        #relevance_b = torch.matmul(input_a.transpose(-1, -2), relevance_norm).mul_(input_b)
+        
+        relevance_batch1 = 0.5 * alpha * torch.bmm(relevance_norm, batch2.transpose(1, 2)) * batch1
+        relevance_batch2 = 0.5 * alpha * torch.bmm(batch1.transpose(1, 2), relevance_norm) * batch2
 
         # Return the gradients for input, batch1, batch2, and None for the other arguments
         return relevance_input, relevance_batch1, relevance_batch2, None, None, None, None
