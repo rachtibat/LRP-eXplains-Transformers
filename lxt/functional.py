@@ -698,8 +698,7 @@ class layer_norm_grad_fn(Function):
             mean = x.mean(dim=-1, keepdim=True)
             var = ((x - mean) ** 2).mean(dim=-1, keepdim=True)
             std = (var + variance_epsilon).sqrt()
-            y = (
-                        x - mean) / std.detach()  # detach std operation will remove it from computational graph i.e. identity rule on x/std
+            y = (x - mean) / std.detach()  # detach std operation will remove it from computational graph i.e. identity rule on x/std
             if weight is not None:
                 y *= weight
             if bias is not None:
