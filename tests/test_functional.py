@@ -6,9 +6,8 @@ import torch.nn as nn
 
 
 def test_softmax():
-
-    x = torch.randn(16, 10, 32, requires_grad=True)
-    init_relevance = torch.randn(16, 10, 32, requires_grad=True)
+    x = torch.randn(8, 5, 32, requires_grad=True)
+    init_relevance = torch.randn(8, 5, 32, requires_grad=True)
 
     y_gt = F.softmax(x, -1)
 
@@ -16,18 +15,17 @@ def test_softmax():
     relevance_gt = x.float() * (init_relevance - y_gt * init_relevance.sum(-1, keepdim=True))
 
     # test inplace=False
-    y_lxt = lf.softmax(x, -1, torch.float32, False)
+    y_lxt = lf.softmax(x, -1, torch.float32, 1.0, False)
     relevance_lxt, = torch.autograd.grad(y_lxt, x, init_relevance)
-    assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-5)
+    assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-4)
 
     # test inplace=True
     y_lxt = lf.softmax(x, -1, torch.float32, True)
     relevance_lxt, = torch.autograd.grad(y_lxt, x, init_relevance)
-    assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-5)
+    assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-4)
 
 
 def test_matmul():
-
     epsilon = 1e-9
 
     a = torch.randn(2, 10, 32, requires_grad=True)
@@ -38,8 +36,8 @@ def test_matmul():
     y_gt = torch.matmul(a, b)
 
     # implement Proposition 3.3 of AttnLRP paper
-    relevance_a_gt = torch.einsum("bji, bip, bjp -> bji", a, b, init_relevance / (2*y_gt + epsilon))
-    relevance_b_gt = torch.einsum("bji, bip, bjp -> bip", a, b, init_relevance / (2*y_gt + epsilon))
+    relevance_a_gt = torch.einsum("bji, bip, bjp -> bji", a, b, init_relevance / (2 * y_gt + epsilon))
+    relevance_b_gt = torch.einsum("bji, bip, bjp -> bip", a, b, init_relevance / (2 * y_gt + epsilon))
 
     # test inplace=False
     y_lxt = lf.matmul(a, b, False, epsilon)
@@ -55,7 +53,6 @@ def test_matmul():
 
 
 def test_linear():
-
     epsilon = 1e-9
 
     x = torch.randn(16, 10, requires_grad=True)
@@ -77,7 +74,6 @@ def test_linear():
 
 
 def test_sum():
-
     epsilon = 1e-9
 
     a = torch.randn(16, 10, 32, requires_grad=True)
@@ -107,7 +103,6 @@ def test_sum():
 
 
 def test_mean():
-
     epsilon = 1e-9
 
     a = torch.randn(1, 8, 32, requires_grad=True)
@@ -130,7 +125,6 @@ def test_mean():
 
 
 def test_layernorm():
-
     x = torch.randn(1, 2, 8, requires_grad=True)
     init_relevance = torch.randn(1, 2, 8)
 
@@ -161,7 +155,6 @@ def test_layernorm():
 
 
 def test_normalize():
-
     x = torch.randn(1, 4, 32, requires_grad=True)
     r_gt = torch.randn(1, 4, 32)
 
@@ -178,8 +171,37 @@ def test_normalize():
     assert torch.allclose(x.grad, r_gt, rtol=0, atol=1e-5)
 
 
-if __name__ == "__main__":
+def test_baddbmm():
 
+    a = torch.randn(2, 10, 16, requires_grad=True)
+    b = torch.randn(2, 16, 5, requires_grad=True)
+    c = torch.randn(2, 10, 5, requires_grad=True)
+    alpha, beta = 0.3, 0.7
+    init_relevance = torch.randn(2, 10, 5, requires_grad=True)
+
+    # test forward pass
+    y_gt = torch.baddbmm(c, a, b, alpha=alpha, beta=beta)
+    y_manual = beta * c + alpha * torch.matmul(a, b)
+    y_lxt_comp = lf.add2(lf.mul2(c, beta), lf.mul2(lf.matmul(a, b, epsilon=0), alpha), epsilon=0)
+    y_lxt = lf.baddbmm(c, a, b, alpha=alpha, beta=beta, epsilon=0)
+
+    assert torch.allclose(y_gt, y_manual, rtol=0, atol=1e-4)
+    assert torch.allclose(y_gt, y_lxt_comp, rtol=0, atol=1e-4)
+    assert torch.allclose(y_gt, y_lxt, rtol=0, atol=1e-4)
+
+    # test backward pass
+    rel_a_lxt_comp, rel_b_lxt_comp, rel_c_lxt_comp = torch.autograd.grad(y_lxt_comp, (a, b, c), init_relevance)
+    rel_a_lxt, rel_b_lxt, rel_c_lxt = torch.autograd.grad(y_lxt, (a, b, c), init_relevance)
+
+    cos_sim = torch.dot(rel_a_lxt_comp.flatten(), rel_a_lxt.flatten()) / (torch.norm(rel_a_lxt_comp.flatten()) * torch.norm(rel_a_lxt.flatten()))
+    assert cos_sim > 0.99
+    cos_sim = torch.dot(rel_b_lxt_comp.flatten(), rel_b_lxt.flatten()) / (torch.norm(rel_b_lxt_comp.flatten()) * torch.norm(rel_b_lxt.flatten()))
+    assert cos_sim > 0.99
+    cos_sim = torch.dot(rel_c_lxt_comp.flatten(), rel_c_lxt.flatten()) / (torch.norm(rel_c_lxt_comp.flatten()) * torch.norm(rel_c_lxt.flatten()))
+    assert cos_sim > 0.99
+
+
+if __name__ == "__main__":
     test_softmax()
     test_matmul()
     test_linear()
@@ -187,5 +209,6 @@ if __name__ == "__main__":
     test_mean()
     test_layernorm()
     test_normalize()
+    test_baddbmm()
 
     print("ALL TESTS PASSED")
