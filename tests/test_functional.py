@@ -1,15 +1,13 @@
 import pytest
 import torch
 import lxt.functional as lf
-import lxt.rules as rules
 from torch.nn import functional as F
 import torch.nn as nn
-from functools import partial
 
 
 def test_softmax():
-    x = torch.randn(16, 10, 32, requires_grad=True)
-    init_relevance = torch.randn(16, 10, 32, requires_grad=True)
+    x = torch.randn(8, 5, 32, requires_grad=True)
+    init_relevance = torch.randn(8, 5, 32, requires_grad=True)
 
     y_gt = F.softmax(x, -1)
 
@@ -17,7 +15,7 @@ def test_softmax():
     relevance_gt = x.float() * (init_relevance - y_gt * init_relevance.sum(-1, keepdim=True))
 
     # test inplace=False
-    y_lxt = lf.softmax(x, -1, torch.float32, False)
+    y_lxt = lf.softmax(x, -1, torch.float32, 1.0, False)
     relevance_lxt, = torch.autograd.grad(y_lxt, x, init_relevance)
     assert torch.allclose(relevance_gt, relevance_lxt, rtol=0, atol=1e-4)
 
@@ -204,13 +202,13 @@ def test_baddbmm():
 
 
 if __name__ == "__main__":
-    # test_softmax()
-    # test_matmul()
-    # test_linear()
-    # test_sum()
-    # test_mean()
-    # test_layernorm()
-    # test_normalize()
-    # test_baddbmm()
+    test_softmax()
+    test_matmul()
+    test_linear()
+    test_sum()
+    test_mean()
+    test_layernorm()
+    test_normalize()
+    test_baddbmm()
 
     print("ALL TESTS PASSED")
