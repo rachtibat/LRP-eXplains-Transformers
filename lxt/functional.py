@@ -419,6 +419,10 @@ class matmul_fn(Function):
     @staticmethod
     def forward(ctx, input_a, input_b, inplace=False, epsilon=1e-6):
 
+        if input_a.requires_grad ^ input_b.requires_grad:
+            raise ValueError("Both inputs must require gradients because lxt's matmul is implented for bi-linear operations. "
+            "If one of the inputs is a constant, use the lxt.functional.linear_epsilon function.")
+
         outputs = torch.matmul(input_a, input_b)
         ctx.save_for_backward(input_a, input_b, outputs)
         ctx.inplace, ctx.epsilon = inplace, epsilon
