@@ -107,7 +107,6 @@ class AttentionValueMatmul(nn.Module):
 
 attnlrp = Composite(
     {
-        nn.Identity: rules.IdentityRule,
         nn.ReLU: rules.IdentityRule,
         nn.Softmax: lm.SoftmaxDT,
         AttentionValueMatmul: rules.UniformEpsilonRule,
@@ -185,7 +184,6 @@ class OPTAttention(nn.Module):
 
         self.softmax = nn.Softmax(dim=-1)  #### <---- LXT
         self.attn_value_matmul = AttentionValueMatmul()  #### <---- LXT
-        self.attn_head_identity = nn.Identity()  #### <---- LXT
 
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int) -> torch.Tensor:
         return (
@@ -325,7 +323,6 @@ class OPTAttention(nn.Module):
                 f" {attn_output.size()}"
             )
 
-        attn_output = self.attn_head_identity(attn_output)  #### <---- LXT
         attn_output = attn_output.view(bsz, self.num_heads, tgt_len, self.head_dim)
         attn_output = attn_output.transpose(1, 2)
 
@@ -597,8 +594,6 @@ class OPTDecoderLayer(nn.Module):
         self.final_layer_norm = lm.LayerNormEpsilon(
             self.embed_dim, elementwise_affine=config.layer_norm_elementwise_affine
         )  #### <---- LXT
-        self.residual = nn.Identity()
-        self.hidden_states = nn.Identity()
 
     def forward(
         self,
@@ -671,8 +666,6 @@ class OPTDecoderLayer(nn.Module):
         )
 
         # hidden_states = (residual + hidden_states).view(hidden_states_shape)
-        hidden_states = self.hidden_states(hidden_states)
-        residual = self.residual(residual)
         hidden_states = lf.add2(residual, hidden_states).view(
             hidden_states_shape
         )  #### <---- LXT
