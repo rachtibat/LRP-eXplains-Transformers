@@ -1,6 +1,7 @@
 .. _latent_feature_attribution:
-Latent Feature Attribution & Visualization
-==========================================
+
+Latent Feature Attribution
+==========================
 
 Since we get relevance values for each neuron in the model as a by-product, we know exactly how important each neuron is for the prediction of the model. 
 Combined with Activation Maximization, we can label neurons in LLMs and even steer the generation process of the LLM by activating specialized knowledge neurons in latent space.
@@ -18,7 +19,7 @@ To trace e.g. the relevance at the residual stream in a LLaMA model, we can atta
 
     import torch
     from transformers import AutoTokenizer
-    from lxt.models.llama import LlamaForCausalLM, attnlrp
+    from lxt.explicit.models.llama import LlamaForCausalLM, attnlrp
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -99,8 +100,3 @@ In the spirit of Mechanistic Interpretability, the relevance score could be used
 
     <embed src="_static/latent_rel_trace.png" width="600">
 
-
-Activation Maximization
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Coming soon ....

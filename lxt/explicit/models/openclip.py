@@ -3,10 +3,10 @@ import itertools
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from lxt.core import Composite
-import lxt.functional as lf
-import lxt.modules as lm
-import lxt.rules as rules
+from lxt.explicit.core import Composite
+import lxt.explicit.functional as lf
+import lxt.explicit.modules as lm
+import lxt.explicit.rules as rules
 
 import open_clip
 import open_clip.transformer

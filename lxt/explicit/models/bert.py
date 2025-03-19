@@ -52,10 +52,10 @@ from transformers.utils import (
 )
 from transformers.models.bert.configuration_bert import BertConfig
 
-import lxt.modules as lm
-import lxt.functional as lf
-import lxt.rules as rules
-from lxt.core import Composite
+import lxt.explicit.modules as lm
+import lxt.explicit.functional as lf
+import lxt.explicit.rules as rules
+from lxt.explicit.core import Composite
 
 attnlrp = Composite({
     nn.ReLU: rules.IdentityRule,

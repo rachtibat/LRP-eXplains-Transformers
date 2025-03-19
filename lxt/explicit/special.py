@@ -2,7 +2,7 @@ import math
 import torch
 import torch.fx
 import torch.nn.functional as F
-import lxt.rules as rules
+import lxt.explicit.rules as rules
 
 
 @torch.no_grad()

@@ -54,10 +54,10 @@ from transformers.utils import (
 from transformers.utils.model_parallel_utils import assert_device_map, get_device_map
 from transformers.models.gpt2.configuration_gpt2 import GPT2Config
 
-import lxt.modules as lm
-import lxt.functional as lf
-import lxt.rules as rules
-from lxt.core import Composite
+import lxt.explicit.modules as lm
+import lxt.explicit.functional as lf
+import lxt.explicit.rules as rules
+from lxt.explicit.core import Composite
 
 class AttentionValueMatmul(nn.Module):
     def forward(self, attn, value):
@@ -85,6 +85,7 @@ class Conv1D(nn.Module):
     def forward(self, x):
         size_out = x.size()[:-1] + (self.nf,)
         #x = torch.addmm(self.bias, x.view(-1, x.size(-1)), self.weight)
+        #x = lf.add2(self.bias, lf.matmul(x.view(-1, x.size(-1)), self.weight))
         x = lf.add2(self.bias, lf.linear_epsilon(x.view(-1, x.size(-1)), self.weight.T))
         x = x.view(size_out)
         return x

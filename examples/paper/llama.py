@@ -1,17 +1,16 @@
 import torch
 from transformers import AutoTokenizer
-from lxt.models.qwen2 import Qwen2ForCausalLM, attnlrp
-from transformers import Qwen2Config
+
+from lxt.explicit.models.llama import LlamaForCausalLM, attnlrp
 from lxt.utils import pdf_heatmap, clean_tokens
+import transformers
 
-path = "Qwen/Qwen2.5-1.5B-Instruct"
+assert torch.__version__.startswith("2.1"), "PyTorch version must be 2.1. Code might not work with newer versions."
+assert transformers.__version__.startswith("4.46"), "Transformers version must be 4.46.2 Code might not work with newer versions."
 
-config = Qwen2Config.from_pretrained(path)
+path = 'meta-llama/Llama-3.1-8B-Instruct'
 
-config._attn_implementation = 'eager'
-
-
-model = Qwen2ForCausalLM.from_pretrained(path, config=config, device_map="cuda")
+model = LlamaForCausalLM.from_pretrained(path, torch_dtype=torch.bfloat16, device_map="cuda")
 tokenizer = AutoTokenizer.from_pretrained(path)
 
 # optional gradient checkpointing to save memory (2x forward pass)
@@ -32,15 +31,19 @@ input_embeds = model.get_input_embeddings()(input_ids)
 output_logits = model(inputs_embeds=input_embeds.requires_grad_(), use_cache=False).logits
 max_logits, max_indices = torch.max(output_logits[0, -1, :], dim=-1)
 
+# get the top k tokens and their logits
+topk_logits, topk_indices = torch.topk(output_logits[0, -1, :], k=5, dim=-1)
+
+# convert token indices to strings
+topk_tokens = tokenizer.convert_ids_to_tokens(topk_indices)
+
+# print the top k tokens and their logits
+for token, logit in zip(topk_tokens, topk_logits):
+    print(f"Token: {token}, Logit: {logit.item()}")
+
 # initialize relevance scores with max_logits itself and backpropagate
 max_logits.backward(max_logits)
 relevance = input_embeds.grad.float().sum(-1).cpu()[0] # cast to float32 before summation for higher precision
-next_token_id = max_indices.item()
-
-# Decode the token
-next_token = tokenizer.decode(next_token_id)
-
-print(f"Next predicted token: {next_token}")
 
 # normalize relevance between [-1, 1] for plotting
 relevance = relevance / relevance.abs().max()

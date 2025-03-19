@@ -22,7 +22,7 @@ For example, to compute the :math:`\varepsilon`-LRP rule for a linear function :
 
 .. code-block:: python
 
-    import lxt.functional as lf
+    import lxt.explicit.functional as lf
 
     y = lf.linear_epsilon(x, W, b)
 
@@ -79,7 +79,7 @@ For example, to compute the :math:`\varepsilon`-LRP rule for a linear layer :mat
    
 .. code-block:: python
 
-    import lxt.modules as lm
+    import lxt.explicit.modules as lm
 
     layer = lm.LinearEpsilon(10, 20)
 

@@ -1,6 +1,6 @@
 .. _under_the_hood:
 How does LXT work under the hood?
-=====
+===================================
 
 We have implemented `custom PyTorch autograd Functions <https://pytorch.org/tutorials/beginner/examples_autograd/two_layer_net_custom_function.html>`_ for commonly used operations in transformers. 
 These functions behave identically in the forward pass, but compute LRP attributions in the backward pass. 

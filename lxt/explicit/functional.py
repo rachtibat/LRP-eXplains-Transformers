@@ -9,7 +9,6 @@ import torch.nn.functional as F
 
 CONSERVATION_CHECK_FLAG = [False]
 
-
 def conservation_check_wrap(func):
     #TODO: bug in add2_fn
     """
@@ -17,7 +16,6 @@ def conservation_check_wrap(func):
     If the sanity check is enabled, the relevance is distributed uniformly to the input tensors, else the relevance is returned as computed by the function.
     This check is useful to verify if the operations used in the model are all LRP-compatible.
     """
-
     def wrapped(ctx, *out_relevance):
 
         inp_relevance = func(ctx, *out_relevance)
@@ -26,18 +24,17 @@ def conservation_check_wrap(func):
 
             out_rel_sum = sum(r.float().sum() for r in out_relevance if r is not None)
             inp_elements = sum(r.numel() for r in inp_relevance if r is not None)
-            inp_rel_mean = out_rel_sum / inp_elements
+            inp_rel_mean = out_rel_sum/inp_elements
 
             if torch.isnan(inp_rel_mean).any():
                 raise ValueError(f"NaN at {func}")
+            
+            inp_relevance = tuple(torch.full(r.shape, inp_rel_mean).to(r.device) if r is not None else None for r in inp_relevance)
 
-            inp_relevance = tuple(
-                torch.full(r.shape, inp_rel_mean).to(r.device) if r is not None else None for r in inp_relevance)
 
         return inp_relevance
-
+        
     return wrapped
-
 
 #####################
 ### LRP FUNCTIONS ###
@@ -62,7 +59,6 @@ def add2(input_a, input_b, inplace=False, epsilon=1e-8):
     """
     return add2_tensors_fn.apply(input_a, input_b, inplace, epsilon)
 
-
 @torch.fx.wrap
 def softmax(input, dim, dtype=None, temperature=1.0, inplace=False):
     """
@@ -81,7 +77,6 @@ def softmax(input, dim, dtype=None, temperature=1.0, inplace=False):
         Whether to perform the operation in place during the backward pass, will overwrite the relevance at the output
     """
     return softmax_fn.apply(input, dim, dtype, temperature, inplace)
-
 
 @torch.fx.wrap
 def linear_epsilon(input, weight, bias=None, epsilon=1e-6):
@@ -104,7 +99,6 @@ def linear_epsilon(input, weight, bias=None, epsilon=1e-6):
     """
     return linear_epsilon_fn.apply(input, weight, bias, epsilon)
 
-
 @torch.fx.wrap
 def matmul(input_a, input_b, inplace=False, epsilon=1e-8):
     """
@@ -123,7 +117,6 @@ def matmul(input_a, input_b, inplace=False, epsilon=1e-8):
         Small value to stabilize the denominator
     """
     return matmul_fn.apply(input_a, input_b, inplace, epsilon)
-
 
 @torch.fx.wrap
 def rms_norm_identity(hidden_states, weight, variance_epsilon):
@@ -145,7 +138,6 @@ def rms_norm_identity(hidden_states, weight, variance_epsilon):
     """
     return rms_norm_identity_fn.apply(hidden_states, weight, variance_epsilon)
 
-
 @torch.fx.wrap
 def mul2(input_a, input_b, inplace=False):
     """
@@ -165,7 +157,6 @@ def mul2(input_a, input_b, inplace=False):
     """
     return mul2_fn.apply(input_a, input_b, inplace)
 
-
 @torch.fx.wrap
 def mean(x, dim, keep_dim, epsilon=1e-6):
     """
@@ -182,9 +173,8 @@ def mean(x, dim, keep_dim, epsilon=1e-6):
     epsilon: float
         Small value to stabilize the denominator
     """
-
+    
     return mean_fn.apply(x, dim, keep_dim, epsilon)
-
 
 @torch.fx.wrap
 def layer_norm(hidden_states, weight, bias, variance_epsilon):
@@ -210,7 +200,6 @@ def layer_norm(hidden_states, weight, bias, variance_epsilon):
 
     return layer_norm_grad_fn.apply(hidden_states, weight, bias, variance_epsilon)
 
-
 @torch.fx.wrap
 def _layer_norm_slower(hidden_states, weight, bias, variance_epsilon):
     """
@@ -231,15 +220,16 @@ def _layer_norm_slower(hidden_states, weight, bias, variance_epsilon):
         Small value to stabilize the denominator
     """
 
+    
     x_mean = mean(hidden_states, -1, keep_dim=True)
 
     # no relevance will flow through std because we detach!
     var = ((hidden_states - x_mean) ** 2).mean(dim=-1, keepdim=True)
     std = (var + variance_epsilon).sqrt().detach()
-
+    
     y = add2(hidden_states, mul2(x_mean, -1))
     # mul2 is identity if the second input does not require gradients
-    y = mul2(y, 1 / std)
+    y = mul2(y, 1/std)
     y = mul2(y, weight)
     y = add2(y, bias)
 
@@ -247,7 +237,7 @@ def _layer_norm_slower(hidden_states, weight, bias, variance_epsilon):
 
 
 @torch.fx.wrap
-def normalize(input, p=2.0, dim=1, eps=1e-12, out=None):
+def normalize(input, p= 2.0, dim= 1, eps= 1e-12, out=None):
     """
     Applies the identity rule on the torch.nn.functional.normalize operation according to Proposition 3.4 of the paper
     'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'
@@ -266,35 +256,8 @@ def normalize(input, p=2.0, dim=1, eps=1e-12, out=None):
     """
 
     assert out is None, "out parameter is not supported"
-
+    
     return normalize_identity_fn.apply(input, p, dim, eps)
-
-
-@torch.fx.wrap
-def baddbmm(input, batch_matrix, batch_vector, beta=1.0, alpha=1.0, inplace=False, epsilon=1e-6):
-    """
-    Computes relevance by sequential application of the epsilon- and uniform-LRP rule according to Proposition 3.3 of the paper
-    'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'
-
-    Parameters:
-    -----------
-    input: torch.Tensor
-        The tensor to which the result of the batched matrix multiplication is added, shape (batch_size, m, n)
-    batch1: torch.Tensor
-        The first input tensor for batched matrix multiplication, shape (batch_size, m, k)
-    batch2: torch.Tensor
-        The second input tensor for batched matrix multiplication, shape (batch_size, k, n)
-    beta: float
-        The scaling factor for the input tensor
-    alpha: float
-        The scaling factor for the result of the batched matrix multiplication
-    inplace: bool
-        Whether to perform the operation in place during the backward pass
-    epsilon: float
-        Small value to stabilize the denominator
-    """
-    return baddbmm_fn.apply(input, batch_matrix, batch_vector, beta, alpha, inplace, epsilon)
-
 
 ###############################
 ### AUTOGRAD IMPLEMENTATION ###
@@ -308,7 +271,7 @@ def _stabilize(input, epsilon=1e-6, inplace=False):
         return input.add_(epsilon)
     else:
         return input + epsilon
-
+    
 
 class softmax_fn(Function):
     """
@@ -334,7 +297,7 @@ class softmax_fn(Function):
             inputs = inputs.to(dtype)
 
         inputs = inputs / temperature
-
+    
         outputs = F.softmax(inputs, dim=dim, dtype=dtype)
 
         ctx.save_for_backward(inputs, outputs)
@@ -355,7 +318,7 @@ class softmax_fn(Function):
             relevance = (out_relevance[0].sub_(output.mul_(out_relevance[0].sum(-1, keepdim=True)))).mul_(inputs)
         else:
             relevance = inputs * (out_relevance[0] - output * out_relevance[0].sum(-1, keepdim=True))
-
+        
         return (relevance, None, None, None, None)
 
 
@@ -380,22 +343,24 @@ class linear_epsilon_fn(Function):
 
     @staticmethod
     def forward(ctx, inputs, weight, bias=None, epsilon=1e-6):
+        
         outputs = F.linear(inputs, weight, bias)
         ctx.save_for_backward(inputs, weight, outputs)
         ctx.epsilon = epsilon
-
+    
         return outputs
 
     @staticmethod
     @conservation_check_wrap
     def backward(ctx, *out_relevance):
+
         inputs, weight, outputs = ctx.saved_tensors
         epsilon = ctx.epsilon
 
         relevance_norm = out_relevance[0] / _stabilize(outputs, epsilon)
 
         relevance = torch.matmul(relevance_norm, weight).mul_(inputs)
-
+        
         return (relevance, None, None, None)
 
 
@@ -415,14 +380,10 @@ class matmul_fn(Function):
     epsilon: float
         Small value to stabilize the denominator
     """
-
+    
     @staticmethod
     def forward(ctx, input_a, input_b, inplace=False, epsilon=1e-6):
-
-        if input_a.requires_grad ^ input_b.requires_grad:
-            raise ValueError("Both inputs must require gradients because lxt's matmul is implented for bi-linear operations. "
-            "If one of the inputs is a constant, use the lxt.functional.linear_epsilon function.")
-
+        
         outputs = torch.matmul(input_a, input_b)
         ctx.save_for_backward(input_a, input_b, outputs)
         ctx.inplace, ctx.epsilon = inplace, epsilon
@@ -443,8 +404,9 @@ class matmul_fn(Function):
 
         relevance_a = torch.matmul(relevance_norm, input_b.transpose(-1, -2)).mul_(input_a)
         relevance_b = torch.matmul(input_a.transpose(-1, -2), relevance_norm).mul_(input_b)
-
+        
         return (relevance_a, relevance_b, None, None)
+
 
 
 class add2_tensors_fn(Function):
@@ -463,10 +425,10 @@ class add2_tensors_fn(Function):
     epsilon: float
         Small value to stabilize the denominator
     """
-
+    
     @staticmethod
     def forward(ctx, input_a, input_b, inplace=False, epsilon=1e-6):
-
+    
         outputs = input_a + input_b
         if any([inp.requires_grad for inp in (input_a, input_b)]):
             ctx.save_for_backward(input_a, input_b)
@@ -497,61 +459,6 @@ class add2_tensors_fn(Function):
         return (relevance_a, relevance_b, None, None)
 
 
-class baddbmm_fn(Function):
-    """
-    Computes relevance by sequential application of the epsilon- and uniform-LRP rule for batched matrix multiplication
-    followed by addition. This is designed for the 'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers' paper.
-
-    Parameters:
-    -----------
-    input: torch.Tensor
-        The tensor to which the result of the batched matrix multiplication is added, shape (batch_size, m, n)
-    batch1: torch.Tensor
-        The first input tensor for batched matrix multiplication, shape (batch_size, m, k)
-    batch2: torch.Tensor
-        The second input tensor for batched matrix multiplication, shape (batch_size, k, n)
-    beta: float
-        The scaling factor for the input tensor
-    alpha: float
-        The scaling factor for the result of the batched matrix multiplication
-    inplace: bool
-        Whether to perform the operation in place during the backward pass
-    epsilon: float
-        Small value to stabilize the denominator
-    """
-
-    @staticmethod
-    def forward(ctx, input, batch1, batch2, beta=1, alpha=1, inplace=False, epsilon=1e-6):
-        # Perform batched matrix multiplication and addition
-        outputs = torch.baddbmm(input, batch1, batch2, beta=beta, alpha=alpha)
-        ctx.save_for_backward(input, batch1, batch2, outputs)
-        ctx.beta, ctx.alpha, ctx.inplace, ctx.epsilon = beta, alpha, inplace, epsilon
-        return outputs
-
-    @staticmethod
-    @conservation_check_wrap
-    def backward(ctx, grad_output):
-        input, batch1, batch2, outputs = ctx.saved_tensors
-        beta, alpha, inplace, epsilon = ctx.beta, ctx.alpha, ctx.inplace, ctx.epsilon
-
-        # Compute the stabilized denominator for relevance normalization
-        if inplace:
-            relevance_norm = grad_output.div_(_stabilize(outputs, epsilon, inplace))
-        else:
-            relevance_norm = grad_output / _stabilize(outputs, epsilon, inplace)
-
-        # Compute relevances for input, batch1, and batch2
-        relevance_input = beta * input * relevance_norm
-
-        #relevance_a = torch.matmul(relevance_norm, input_b.transpose(-1, -2)).mul_(input_a)
-        #relevance_b = torch.matmul(input_a.transpose(-1, -2), relevance_norm).mul_(input_b)
-        
-        relevance_batch1 = 0.5 * alpha * torch.bmm(relevance_norm, batch2.transpose(1, 2)) * batch1
-        relevance_batch2 = 0.5 * alpha * torch.bmm(batch1.transpose(1, 2), relevance_norm) * batch2
-
-        # Return the gradients for input, batch1, batch2, and None for the other arguments
-        return relevance_input, relevance_batch1, relevance_batch2, None, None, None, None
-
 
 class rms_norm_identity_fn(Function):
     """
@@ -573,6 +480,7 @@ class rms_norm_identity_fn(Function):
 
     @staticmethod
     def forward(ctx, hidden_states, weight, variance_epsilon):
+
         input_dtype = hidden_states.dtype
         hidden_states = hidden_states.to(torch.float32)
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
@@ -583,6 +491,7 @@ class rms_norm_identity_fn(Function):
     @staticmethod
     @conservation_check_wrap
     def backward(ctx, *out_relevance):
+
         return out_relevance + (None, None)
 
 
@@ -603,11 +512,11 @@ class mul2_fn(Function):
         Whether to perform the operation in place during the backward pass, will overwrite the relevance at the output
     """
 
+
     @staticmethod
     def forward(ctx, input_a, input_b, inplace=False):
 
-        ctx.requires_grads = [i for i, inp in enumerate((input_a, input_b)) if
-                              isinstance(inp, torch.Tensor) and inp.requires_grad]
+        ctx.requires_grads = [i for i, inp in enumerate((input_a, input_b)) if isinstance(inp, torch.Tensor) and inp.requires_grad]
         ctx.inplace = inplace
 
         return input_a * input_b
@@ -647,7 +556,7 @@ class mean_fn(Function):
     def forward(ctx, x, dim, keepdim, epsilon=1e-6):
 
         y = x.mean(dim, keepdim)
-
+    
         ctx.save_for_backward(x)
         ctx.epsilon, ctx.dim, ctx.keepdim = epsilon, dim, keepdim
 
@@ -672,7 +581,7 @@ class mean_fn(Function):
             relevance = relevance.squeeze(ctx.dim)
 
         return (relevance, None, None, None)
-
+    
 
 class layer_norm_grad_fn(Function):
     """
@@ -702,7 +611,7 @@ class layer_norm_grad_fn(Function):
             mean = x.mean(dim=-1, keepdim=True)
             var = ((x - mean) ** 2).mean(dim=-1, keepdim=True)
             std = (var + variance_epsilon).sqrt()
-            y = (x - mean) / std.detach()  # detach std operation will remove it from computational graph i.e. identity rule on x/std
+            y = (x - mean) / std.detach() # detach std operation will remove it from computational graph i.e. identity rule on x/std
             if weight is not None:
                 y *= weight
             if bias is not None:
@@ -723,7 +632,7 @@ class layer_norm_grad_fn(Function):
 
         grads, = torch.autograd.grad(y, x, relevance_norm)
 
-        return (grads * x, None, None, None, None)
+        return (grads*x, None, None, None, None)
 
 
 class normalize_identity_fn(Function):
@@ -746,9 +655,11 @@ class normalize_identity_fn(Function):
 
     @staticmethod
     def forward(ctx, input, p, dim, eps):
+
         return F.normalize(input, p=p, dim=dim, eps=eps)
 
     @staticmethod
     @conservation_check_wrap
     def backward(ctx, *out_relevance):
+
         return out_relevance + (None, None, None)

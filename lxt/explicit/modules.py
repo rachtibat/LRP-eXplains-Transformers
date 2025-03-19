@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import inspect
-import lxt.functional as lf
-import lxt.special as ls
+import lxt.explicit.functional as lf
+import lxt.explicit.special as ls
 import torch.fx
 
 
@@ -30,6 +30,7 @@ class LinearEpsilon(nn.Linear):
 
     def forward(self, inputs):
         return lf.linear_epsilon(inputs, self.weight, self.bias, self.epsilon)
+    
 
 class RMSNormIdentity(nn.Module):
     def __init__(self, hidden_size, eps=1e-6):

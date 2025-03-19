@@ -53,11 +53,11 @@ from transformers.models.mixtral.configuration_mixtral import MixtralConfig
 
 ####################################################
 ############### LXT ###############################
-from lxt.modules import RMSNormIdentity
-import lxt.functional as lf
-import lxt.modules as lm
-import lxt.rules as rules
-from lxt.core import Composite
+from lxt.explicit.modules import RMSNormIdentity
+import lxt.explicit.functional as lf
+import lxt.explicit.modules as lm
+import lxt.explicit.rules as rules
+from lxt.explicit.core import Composite
 from bitsandbytes.nn import Linear4bit, Linear8bitLt
 
 class AttentionValueMatmul(nn.Module):
