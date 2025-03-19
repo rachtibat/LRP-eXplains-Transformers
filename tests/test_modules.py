@@ -2,10 +2,10 @@ import pytest
 import math
 import torch
 import torch.nn as nn
-import lxt.modules as lm
-import lxt.special as ls
-import lxt.rules as rules
-from lxt.core import Composite
+import lxt.explicit.modules as lm
+import lxt.explicit.special as ls
+import lxt.explicit.rules as rules
+from lxt.explicit.core import Composite
 
 def test_LayerNorm():
 

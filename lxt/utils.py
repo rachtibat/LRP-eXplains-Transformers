@@ -1,7 +1,6 @@
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 import os
-import torch
 import subprocess
 from pathlib import Path
 
@@ -30,8 +29,7 @@ def _generate_latex(words, relevances, cmap="bwr"):
         rgb = _apply_colormap(relevance, cmap)
         r, g, b = int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255)
 
-        if word.startswith('▁') or word.startswith('Ġ'):
-            word = word.replace('▁', ' ').replace('Ġ', ' ')
+        if word.startswith(' '):
             latex_code += f' \\colorbox[RGB]{{{r},{g},{b}}}{{\\strut {word}}}'
         else:
             latex_code += f'\\colorbox[RGB]{{{r},{g},{b}}}{{\\strut {word}}}'
@@ -95,8 +93,23 @@ def pdf_heatmap(words, relevances, cmap="bwr", path='heatmap.pdf', delete_aux_fi
 
 
 def clean_tokens(words):
-    # add before special characters the escape character /
+    """
+    Clean wordpiece tokens by removing special characters and splitting them into words.
+    """
 
+    if any("▁" in word for word in words):
+        words = [word.replace("▁", " ") for word in words]
+    
+    elif any("Ġ" in word for word in words):
+        words = [word.replace("Ġ", " ") for word in words]
+    
+    elif any("##" in word for word in words):
+        words = [word.replace("##", "") if "##" in word else " " + word for word in words]
+        words[0] = words[0].strip()
+
+    else:
+        raise ValueError("The tokenization scheme is not recognized.")
+    
     special_characters = ['&', '%', '$', '#', '_', '{', '}', '\\']
     for i, word in enumerate(words):
         for special_character in special_characters:

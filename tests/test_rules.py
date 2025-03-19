@@ -1,7 +1,7 @@
 import pytest
 import torch
-import lxt.rules as rules
-import lxt.functional as lf
+import lxt.explicit.rules as rules
+import lxt.explicit.functional as lf
 from torch.nn import functional as F
 import torch.nn as nn
 from functools import partial

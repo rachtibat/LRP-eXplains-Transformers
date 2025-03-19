@@ -15,7 +15,7 @@ print("OK", _PATH_ROOT)
 project = 'LXT'
 copyright = '2024, Reduan Achtibat'
 author = 'Reduan Achtibat'
-release = '1.0'
+release = '2.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
