@@ -16,10 +16,10 @@ Rules
 ~~~~~
 
 
-In contrast to the ``lxt.functional`` and ``lxt.modules`` drop-in-replacements, we also provide more abstract "super-functions" that compute LRP rules using PyTorch's vector-Jacobian products for arbitrary modules.
+In contrast to the ``lxt.explicit.functional`` and ``lxt.explicit.modules`` drop-in-replacements, we also provide more abstract "super-functions" that compute LRP rules using PyTorch's vector-Jacobian products for arbitrary modules.
 These super-functions wrap modules and hence we do not need to replace each operation!
 
-These rules must be used inside a ``lxt.core.Composite``, that we will show below.
+These rules must be used inside a ``lxt.explicit.core.Composite``, that we will show below.
 For now, here you see a non-exhaustive list of available rules:
 
 
@@ -31,22 +31,22 @@ For now, here you see a non-exhaustive list of available rules:
       - LXT
       - Description
     * - :math:`\varepsilon`-LRP
-      - lxt.rules.EpsilonRule
+      - lxt.explicit.rules.EpsilonRule
       - standard :math:`\varepsilon`-LRP
     * - Uniform Rule
-      - lxt.rules.UniformRule
+      - lxt.explicit.rules.UniformRule
       - distributes relevance uniformely to all input arguments
     * - Uniform and :math:`\varepsilon`-LRP
-      - lxt.rules.UniformEpsilonRule
+      - lxt.explicit.rules.UniformEpsilonRule
       - sequential application of the :math:`\varepsilon`-LRP and uniform rule
     * - Identity Rule
-      - lxt.rules.IdentityRule
+      - lxt.explicit.rules.IdentityRule
       - passes the relevance without modification through to the input variables
     * - Stop Relevance Flow
-      - lxt.rules.StopRelevanceRule
+      - lxt.explicit.rules.StopRelevanceRule
       - stops the relevance flow by setting input relevances to None (zero)
     * - Deep Taylor Decomposition
-      - lxt.rules.TaylorDecompositionRule
+      - lxt.explicit.rules.TaylorDecompositionRule
       - standard Deep Taylor Decomposition with or without bias
 
 
@@ -54,18 +54,18 @@ For now, here you see a non-exhaustive list of available rules:
 The Composite
 ~~~~~~~~~~~~~
 
-To attach rules and replace modules in your model, we provide the ``lxt.core.Composite`` class.
+To attach rules and replace modules in your model, we provide the ``lxt.explicit.core.Composite`` class.
 This class replaces the attributes of your model with LXT variants.
 
-The Composite takes as argument a dictionary, where the keys represent ``nn.Module`` types and the values are either ``lxt.rules`` or ``lxt.modules``.
+The Composite takes as argument a dictionary, where the keys represent ``nn.Module`` types and the values are either ``lxt.explicit.rules`` or ``lxt.explicit.modules``.
 
 Let's say we have a simple Sequential model containing a linear and a root-mean-square normalization layer.
 Then, we'd like to apply the :math:`\varepsilon`-LRP on the linear layer and the identity rule (passing the relevence through) to the normalization layer.
 
 .. code-block:: python
 
-    from lxt.core import Composite
-    import lxt.rules as rules
+    from lxt.explicit.core import Composite
+    import lxt.explicit.rules as rules
 
     model = nn.Sequential(
         nn.Linear(10, 10),
@@ -96,13 +96,13 @@ That's it! If you look at the print statement in your console, you will see that
 
     <embed src="_static/terminal.png" height="200">
 
-You could also supply ``lxt.modules`` instead of ``lxt.rules``, such as 
+You could also supply ``lxt.explicit.modules`` instead of ``lxt.explicit.rules``, such as 
 
 .. code-block:: python
 
   lrp = Composite({
-          nn.Linear: lxt.modules.LinearEpsilon,
-          RootMeanSquareNorm: lxt.modules.RMSNormIdentity,
+          nn.Linear: lxt.explicit.modules.LinearEpsilon,
+          RootMeanSquareNorm: lxt.explicit.modules.RMSNormIdentity,
       })
 
 To revert the modification, simply write
@@ -127,7 +127,7 @@ torch.fx Graph Manipulation
 So that LXT works properly, you have to replace **all** operations where the gradient is not equal to a relevance propagation rule.
 For instance, in many projects you will find a line of code adding two tensors, such as ``hidden_states = hidden_states + residual``.
 
-With LXT, we must replace this line of code with ``hidden_states = lxt.functional.add2(hidden_states, residual)``. 
+With LXT, we must replace this line of code with ``hidden_states = lxt.explicit.functional.add2(hidden_states, residual)``. 
 However, since replacing all lines might be tedious, we exploited ``torch.fx`` to replace these operations for us automatically!
 
 To use ``torch.fx``, you must supply a dummy input
@@ -158,9 +158,9 @@ To use ``torch.fx``, you must supply a dummy input
       model = SimpleModel()
 
       lrp = Composite({
-          nn.Linear: lxt.rules.EpsilonRule,
-          operator.add: lxt.functional.add2,
-          torch.nn.functional.softmax: lxt.functional.softmax,
+          nn.Linear: lxt.explicit.rules.EpsilonRule,
+          operator.add: lxt.explicit.functional.add2,
+          torch.nn.functional.softmax: lxt.explicit.functional.softmax,
       })
 
       x = torch.randn(1, 32, 10, requires_grad=True)

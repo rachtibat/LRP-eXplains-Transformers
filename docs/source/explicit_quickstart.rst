@@ -15,7 +15,7 @@ In order to achieve this, we implemented `custom PyTorch autograd Functions <htt
 To understand how LXT works under the hood, you can read :ref:`under_the_hood`.
 
 For a quick demo, we provide modified huggingface source-code for (Tiny)LLaMA 2, T5 and Mixtral 8x7b, where we replaced all torch operations with LRP-compatible operations.
-You can find all models in ``lxt.models``.
+You can find all models in ``lxt.explicit.models``.
 
 It is recommended to install ``accelerate`` to load huge LLM weights.
 
@@ -209,7 +209,7 @@ One such rule is the Gamma rule. However, this rule requires to tune a gamma hyp
 For simplicity, we select a few values that can be manually evaluated by looking at the heatmaps.
 
 In contrast to the examples above, we take here advantage of the torch.fx graph manipulation capabilities introduced in :ref:`on_the_fly`.
-In ``lxt.models.openclip.attnlrp``, we define a set of functions that are present inside the OpenCLIP ViT-G-14 model and replace them with LXT-compatible functions (Take a look into it!).
+In ``lxt.explicit.models.openclip.attnlrp``, we define a set of functions that are present inside the OpenCLIP ViT-G-14 model and replace them with LXT-compatible functions (Take a look into it!).
 Further, we use the library ``Zennit`` to define rules for the Conv2d and Linear layers, because LXT does not support the ``Gamma`` rule yet and
 ``Zennit`` has more rules to choose from, e.g. ``ZPlus``, ``AlphaBeta``, ``Epsilon`` etc.
 
