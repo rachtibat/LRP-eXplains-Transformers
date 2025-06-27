@@ -1,16 +1,16 @@
 # Copyright 2024, Fraunhofer-Gesellschaft zur Förderung der angewandten Forschung e.V. &
 # the authors: Reduan Achtibat, Sayed Mohammad Vakilzadeh Hatefi, Maximilian Dreyer, Aakriti Jain,
 # Thomas Wiegand, Sebastian Lapuschkin, Wojciech Samek. All rights reserved.
-# 
+#
 # This code is based on the following work:
-# 
+#
 #   'AttnLRP: Attention-Aware Layer-Wise Relevance Propagation for Transformers. ICML 2024.'
 #
 # The copyright in this software is being made available under the Clear BSD License.
 # No patent rights, trademark rights and/or other Intellectual Property Rights other than
 # the copyrights concerning the Software are granted under this license.
 # You may obtain a full copy of the License at
-#     
+#
 #   https://github.com/rachtibat/LRP-eXplains-Transformers/blob/main/LICENSE
 #
 from warnings import warn

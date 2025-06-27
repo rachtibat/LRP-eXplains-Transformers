@@ -7,13 +7,16 @@ import lxt.explicit.special as ls
 import lxt.explicit.rules as rules
 from lxt.explicit.core import Composite
 
+
 def test_LayerNorm():
 
     layer_gt = nn.LayerNorm(4092)
     layer_gt.weight = nn.Parameter(torch.randn(4092))
     layer_gt.bias = nn.Parameter(torch.randn(4092))
 
-    layer_lxt = lm.INIT_MODULE_MAPPING[lm.LayerNormEpsilon](layer_gt, lm.LayerNormEpsilon)
+    layer_lxt = lm.INIT_MODULE_MAPPING[lm.LayerNormEpsilon](
+        layer_gt, lm.LayerNormEpsilon
+    )
 
     x = torch.randn(32, 500, 4092)
 
@@ -43,7 +46,9 @@ def test_MultiheadAttention():
 
     layer_gt = nn.MultiheadAttention(512, 4, batch_first=True)
 
-    layer_lxt = lm.INIT_MODULE_MAPPING[lm.MultiheadAttention_CP](layer_gt, lm.MultiheadAttention_CP)
+    layer_lxt = lm.INIT_MODULE_MAPPING[lm.MultiheadAttention_CP](
+        layer_gt, lm.MultiheadAttention_CP
+    )
 
     ### test forward pass
     x = torch.randn(4, 12, 512)
@@ -57,19 +62,25 @@ def test_MultiheadAttention():
 
     ### test backward pass
     def attribute_MLH_ground_truth(x, attn_mask):
-        
+
         batch_size, q_seq_length, embed_dim = x.shape
 
-        q = torch.nn.functional.linear(x, layer_lxt.q_proj_weight, bias=layer_lxt.bias_q)
-        k = torch.nn.functional.linear(x, layer_lxt.k_proj_weight, bias=layer_lxt.bias_k)
-        v = torch.nn.functional.linear(x, layer_lxt.v_proj.weight, bias=layer_lxt.v_proj.bias)
+        q = torch.nn.functional.linear(
+            x, layer_lxt.q_proj_weight, bias=layer_lxt.bias_q
+        )
+        k = torch.nn.functional.linear(
+            x, layer_lxt.k_proj_weight, bias=layer_lxt.bias_k
+        )
+        v = torch.nn.functional.linear(
+            x, layer_lxt.v_proj.weight, bias=layer_lxt.v_proj.bias
+        )
 
         # -- reshape for multiheadattention
         q = q.view(batch_size, q_seq_length, layer_lxt.num_heads, layer_lxt.head_dim)
         k = k.view(batch_size, q_seq_length, layer_lxt.num_heads, layer_lxt.head_dim)
         v = v.view(batch_size, q_seq_length, layer_lxt.num_heads, layer_lxt.head_dim)
 
-        q = q.permute(0, 2, 1, 3) # [Batch, Head, SeqLen, Embed]
+        q = q.permute(0, 2, 1, 3)  # [Batch, Head, SeqLen, Embed]
         k = k.permute(0, 2, 1, 3)
         v = v.permute(0, 2, 1, 3)
 
@@ -87,10 +98,12 @@ def test_MultiheadAttention():
         # -- out projection
         y = y.permute(0, 2, 1, 3)
         y = y.reshape(batch_size, q_seq_length, embed_dim)
-        out = torch.nn.functional.linear(y, layer_lxt.out_proj.weight, bias=layer_lxt.out_proj.bias)
+        out = torch.nn.functional.linear(
+            y, layer_lxt.out_proj.weight, bias=layer_lxt.out_proj.bias
+        )
 
         return out
-    
+
     # apply epsilon rule on whole MHA function with softmax.detach() -> should be equal to lm.MultiheadAttention_CP
     x = torch.randn(4, 12, 512, requires_grad=True)
     y_gt = rules.epsilon_lrp_fn.apply(attribute_MLH_ground_truth, 1e-6, x, attn_mask)
@@ -99,10 +112,12 @@ def test_MultiheadAttention():
     rel_gt = x.grad
     x.grad = None
 
-    Composite({
-        lm.LinearInProjection: rules.EpsilonRule,
-        lm.LinearOutProjection: rules.EpsilonRule,
-    }).register(layer_lxt)
+    Composite(
+        {
+            lm.LinearInProjection: rules.EpsilonRule,
+            lm.LinearOutProjection: rules.EpsilonRule,
+        }
+    ).register(layer_lxt)
 
     y_lxt, _ = layer_lxt(x, x, x, attn_mask=attn_mask)
 
@@ -116,8 +131,6 @@ def test_MultiheadAttention():
 
     cos_sim = torch.dot(rel_gt, rel_lxt) / (torch.norm(rel_gt) * torch.norm(rel_lxt))
     assert cos_sim > 0.99
-
-
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from torch.fx import GraphModule
 from warnings import warn
 from tabulate import tabulate
 
+
 class Composite:
     """
     Base class for composites. A composite is a collection of rules that are applied to a model.
@@ -23,7 +24,7 @@ class Composite:
     """
 
     def __init__(self, layer_map, canonizers=[], zennit_composite=None) -> None:
-        
+
         self.layer_map = layer_map
         self.original_modules = []
 
@@ -34,12 +35,20 @@ class Composite:
 
         for c in canonizers:
             if isinstance(c, type):
-                raise ValueError(f"You must call the canonizer {c}(). You passed the class instead of an instance.")
-
+                raise ValueError(
+                    f"You must call the canonizer {c}(). You passed the class instead of an instance."
+                )
 
         self.zennit_composite = zennit_composite
 
-    def register(self, parent: nn.Module, dummy_inputs: dict=None, tracer=HFTracer, verbose=False, no_grad=True) -> None:
+    def register(
+        self,
+        parent: nn.Module,
+        dummy_inputs: dict = None,
+        tracer=HFTracer,
+        verbose=False,
+        no_grad=True,
+    ) -> None:
         """
         Register the composite to the model and apply the canonizers to the model, if available.
 
@@ -78,8 +87,10 @@ class Composite:
             self._iterate_children(parent, module_map)
 
         if fn_map or dummy_inputs:
-            parent = self._iterate_graph(parent, dummy_inputs, fn_map, module_map, tracer)
-        
+            parent = self._iterate_graph(
+                parent, dummy_inputs, fn_map, module_map, tracer
+            )
+
         # register an optional zennit composite
         if self.zennit_composite:
             if verbose:
@@ -96,15 +107,18 @@ class Composite:
         module_map, fn_map = {}, {}
         for key, value in layer_map.items():
 
-            if isinstance(key, str) or isinstance(key, nn.Module.__class__): #TODO. wrap module?
+            if isinstance(key, str) or isinstance(
+                key, nn.Module.__class__
+            ):  # TODO. wrap module?
                 module_map.update({key: value})
             elif callable(key):
                 fn_map.update({key: value})
             else:
-                raise ValueError(f"Key {key} must be a subclass of nn.Module, a string or a callable function.")
-            
-        return module_map, fn_map
+                raise ValueError(
+                    f"Key {key} must be a subclass of nn.Module, a string or a callable function."
+                )
 
+        return module_map, fn_map
 
     def _iterate_children(self, parent: nn.Module, rule_dict):
         """
@@ -124,10 +138,12 @@ class Composite:
         """
 
         for layer_type, rule in rule_dict.items():
-            
+
             # check if the layer_type is a string and or if the layer_type is a class and the child is an instance of it
-            if (isinstance(layer_type, str) and layer_type == child) or isinstance(child, layer_type):
-                
+            if (isinstance(layer_type, str) and layer_type == child) or isinstance(
+                child, layer_type
+            ):
+
                 if issubclass(rule, WrapModule):
                     # replace module with LXT.rules.WrapModule and attach it to parent as attribute
                     xai_module = rule(child)
@@ -138,7 +154,9 @@ class Composite:
                     # return the new module to iterate through its children to attach the rules
                     child = xai_module
                 else:
-                    raise ValueError(f"Rule {rule} must be a subclass of WrapModule or a torch.nn.Module")
+                    raise ValueError(
+                        f"Rule {rule} must be a subclass of WrapModule or a torch.nn.Module"
+                    )
 
                 setattr(parent, name, xai_module)
 
@@ -146,20 +164,23 @@ class Composite:
                 self.original_modules.append((parent, name, child))
 
                 return child
-        
+
         # could not find a rule for the module
 
         return child
 
-
     def _iterate_graph(self, model, dummy_inputs, fn_map, module_map, tracer=HFTracer):
 
-        #TODO: dont trace through detach
+        # TODO: dont trace through detach
 
         assert isinstance(dummy_inputs, dict), "dummy_inputs must be a dictionary"
         assert dummy_inputs, "dummy_inputs must not be empty"
 
-        graph = tracer().trace(model, concrete_args=get_concrete_args(model, dummy_inputs.keys()), dummy_inputs=dummy_inputs)
+        graph = tracer().trace(
+            model,
+            concrete_args=get_concrete_args(model, dummy_inputs.keys()),
+            dummy_inputs=dummy_inputs,
+        )
 
         module_types = list(module_map.values())
         for node in graph.nodes:
@@ -171,7 +192,6 @@ class Composite:
         traced.recompile()
 
         return traced
-
 
     def _attach_function_rule(self, node, fn_map, module_types):
         """
@@ -186,19 +206,19 @@ class Composite:
             A dictionary of the form {function: rule} where 'function' is a callable function and 'rule' is a callable function.
         module_types: list
             A list of module types that have already been wrapped by a LRP rule.
-        
+
         """
 
         # if the parent module of the node has already been wrapped by a LRP rule, we do not want to replace a function inside it
         if self._check_already_wrapped(node, module_types):
-            
+
             # record all modules that have already been wrapped by a LRP rule as replaced for verbose debugging
             self._add_to_module_summary(node, True)
 
             return False
 
-        if node.op == 'call_function':
-            
+        if node.op == "call_function":
+
             # if the function is in the composite, replace it with the LRP function
             if node.target in fn_map:
 
@@ -212,25 +232,23 @@ class Composite:
             # record all missing functions for verbose debugging
             self._add_to_fn_summary(node, False)
 
-        elif node.op == 'call_method':
-            
+        elif node.op == "call_method":
+
             # we limit ourselves for now to replace only functions, not methods (e.g. tensor.add, tensor.sum, etc.)
             # record all methods for verbose debugging as not replaced
             self._add_to_fn_summary(node, False)
 
-        elif node.op == 'call_module':
-            
+        elif node.op == "call_module":
+
             # record all modules not wrapped by a LRP rule as not replaced for verbose debugging
             self._add_to_module_summary(node, False)
 
-        
         return False
-    
 
     def _check_already_wrapped(self, node, module_types):
         """
-        Check if a module has already been wrapped with a rule by reading the module stack information 
-        in the node meta data. This is important because, we do not want to replace a function inside 
+        Check if a module has already been wrapped with a rule by reading the module stack information
+        in the node meta data. This is important because, we do not want to replace a function inside
         a module that has already been replaced or wrapped by a LXT rule.
 
         Parameters
@@ -248,7 +266,7 @@ class Composite:
             return False
         else:
             return False
-        
+
     def _add_to_module_summary(self, node, replaced: bool):
         """
         This method is used for verbose debugging. It records all modules that have been replaced or not replaced by the composite.
@@ -261,18 +279,17 @@ class Composite:
         replaced: bool
             A boolean indicating if the module has been replaced by the user in the composite.
         """
-        
+
         l_name, l_type = list(node.meta["nn_module_stack"].items())[-1]
 
         if l_type not in self.module_summary:
             self.module_summary[l_type] = replaced
-    
-    
+
     def _add_to_fn_summary(self, node, replaced: bool):
         """
         This method is used for verbose debugging. It records all functions that have been replaced or not replaced by the composite.
         We provide a non-exhaustive whitelist of functions that are compatible with LRP (i.e. their gradients are equal to LRP relevances) and
-        a blacklist of functions that are not compatible with LRP. If a function is in the whitelist or replaced by the user in the composite, we record it as "True". 
+        a blacklist of functions that are not compatible with LRP. If a function is in the whitelist or replaced by the user in the composite, we record it as "True".
         If a function is in the blacklist, we record it as "False". If a function is not in the whitelist or the blacklist, we record it as "unknown".
 
         Parameters
@@ -282,7 +299,7 @@ class Composite:
         replaced: bool
             A boolean indicating if the function has been replaced by the user in the composite.
         """
-        
+
         # get the parent module name where the function is located
         if "nn_module_stack" in node.meta:
             module_name = list(node.meta["nn_module_stack"].values())[-1]
@@ -300,7 +317,6 @@ class Composite:
             self.function_summary[module_name][node.target] = "problematic"
         else:
             self.function_summary[module_name][node.target] = "unknown"
-
 
     def print_summary(self):
 
@@ -335,17 +351,20 @@ class Composite:
         table = tabulate(data, headers=headers, tablefmt="grid")
         print(table)
 
-
     def remove(self):
         """
         Remove the composite from the model and revert the original modules.
         #TODO: in-depth explanation
         """
 
-        warn("This functionality is not yet fully tested. Please check the model after removing the composite.")
+        warn(
+            "This functionality is not yet fully tested. Please check the model after removing the composite."
+        )
 
         if self.function_summary:
-            warn("Some functions have been replaced by tracing the model with torch.fx. You can't reverse function replacements, but only nn.Module and Zennit replacements.")
+            warn(
+                "Some functions have been replaced by tracing the model with torch.fx. You can't reverse function replacements, but only nn.Module and Zennit replacements."
+            )
 
         for parent, name, module in self.original_modules:
             rule = getattr(parent, name)
@@ -357,18 +376,17 @@ class Composite:
 
         self.original_modules = []
         self.canonizer_instances = []
-        
+
         if self.zennit_composite is not None:
             self.zennit_composite.remove()
 
     def context(self, module, verbose=False):
-       
+
         return CompositeContext(module, self, verbose)
-    
 
 
 class CompositeContext:
-    '''
+    """
     A context object to register a composite in a context and remove the associated hooks and canonizers afterwards.
     Taken from the 'zennit' library for neural network interpretability.
 
@@ -378,7 +396,8 @@ class CompositeContext:
         The module to which composite should be registered.
     composite: Composite
         The composite which shall be registered to module.
-    '''
+    """
+
     def __init__(self, module, composite, verbose):
         self.module = module
         self.composite = composite
@@ -391,5 +410,3 @@ class CompositeContext:
     def __exit__(self, exc_type, exc_value, traceback):
         self.composite.remove()
         return False
-
-

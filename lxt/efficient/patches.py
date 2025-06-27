@@ -1,16 +1,16 @@
 # Copyright 2024, Fraunhofer-Gesellschaft zur Förderung der angewandten Forschung e.V. &
 # the authors: Reduan Achtibat, Sayed Mohammad Vakilzadeh Hatefi, Maximilian Dreyer, Aakriti Jain,
 # Thomas Wiegand, Sebastian Lapuschkin, Wojciech Samek. All rights reserved.
-# 
+#
 # This code is based on the following work:
-# 
+#
 #   'AttnLRP: Attention-Aware Layer-Wise Relevance Propagation for Transformers. ICML 2024.'
 #
 # The copyright in this software is being made available under the Clear BSD License.
 # No patent rights, trademark rights and/or other Intellectual Property Rights other than
 # the copyrights concerning the Software are granted under this license.
 # You may obtain a full copy of the License at
-#     
+#
 #   https://github.com/rachtibat/LRP-eXplains-Transformers/blob/main/LICENSE
 #
 import sys
@@ -38,7 +38,7 @@ def check_already_patched(target_fn, new_fn):
     """
 
     if target_fn.__module__ == new_fn.__module__:
-        if hasattr(target_fn, '__name__'):
+        if hasattr(target_fn, "__name__"):
             warn(f"{target_fn.__name__} already patched.")
         else:
             warn(f"{target_fn} already patched.")
@@ -61,18 +61,18 @@ def patch_method(fn, module, method_name="forward", keep_original=False):
     keep_original : bool, optional
         If True, the original method is saved in the module as f"original_{method_name}".
         Default is False.
-    
+
     Returns
     -------
     bool
         True if the method was successfully patched, False otherwise.
     """
-    
+
     if check_already_patched(getattr(module, method_name), fn):
         return False
     if keep_original:
-        setattr(module, f'original_{method_name}', getattr(module, method_name))
-    
+        setattr(module, f"original_{method_name}", getattr(module, method_name))
+
     setattr(module, method_name, fn)
     return True
 
@@ -87,7 +87,7 @@ def replace_module(patched_module, original_module):
         The module whose attributes will be copied to the original module.
     original_module : module
         The module whose attributes will be replaced by the patched module.
-    
+
     Returns
     -------
     bool
@@ -98,7 +98,7 @@ def replace_module(patched_module, original_module):
 
     # Then replace all attributes
     for attr in dir(patched_module):
-        if not attr.startswith('__'):  # Skip special methods
+        if not attr.startswith("__"):  # Skip special methods
             setattr(original_module, attr, getattr(patched_module, attr))
 
     return True
@@ -107,6 +107,7 @@ def replace_module(patched_module, original_module):
 #############################
 ###### AttnLRP Patches ######
 #############################
+
 
 def rms_norm_forward(self, hidden_states):
     """
@@ -118,7 +119,9 @@ def rms_norm_forward(self, hidden_states):
     input_dtype = hidden_states.dtype
     hidden_states = hidden_states.to(torch.float32)
     variance = hidden_states.pow(2).mean(-1, keepdim=True)
-    hidden_states = hidden_states * stop_gradient(torch.rsqrt(variance + self.variance_epsilon))
+    hidden_states = hidden_states * stop_gradient(
+        torch.rsqrt(variance + self.variance_epsilon)
+    )
 
     return self.weight * hidden_states.to(input_dtype)
 
@@ -180,7 +183,7 @@ def patch_attention(module):
         return False
     else:
         module.eager_attention_forward = new_forward
-    
+
     NEW_ATTENTION_FUNCTIONS = {}
     for key, value in module.ALL_ATTENTION_FUNCTIONS.items():
         new_forward = wrap_attention_forward(value)
@@ -189,7 +192,7 @@ def patch_attention(module):
         else:
             NEW_ATTENTION_FUNCTIONS[key] = new_forward
     module.ALL_ATTENTION_FUNCTIONS = NEW_ATTENTION_FUNCTIONS
-            #module.ALL_ATTENTION_FUNCTIONS[key] = new_forward
+    # module.ALL_ATTENTION_FUNCTIONS[key] = new_forward
     return True
 
 
@@ -200,9 +203,10 @@ def wrap_attention_forward(forward_fn):
         key = divide_gradient(key, 4)
         value = divide_gradient(value, 2)
 
-        if 'dropout' in kwargs:
-            kwargs['dropout'] = 0.0
+        if "dropout" in kwargs:
+            kwargs["dropout"] = 0.0
         return forward_fn(module, query, key, value, *args, **kwargs)
+
     return attention_forward
 
 
@@ -223,10 +227,10 @@ def dropout_forward(self, x):
     return x
 
 
-
 ############################
 ###### CP-LRP Patches ######
 ############################
+
 
 def patch_cp_attention(module):
     """
@@ -239,7 +243,7 @@ def patch_cp_attention(module):
         return False
     else:
         module.eager_attention_forward = new_forward
-    
+
     for key, value in module.ALL_ATTENTION_FUNCTIONS.items():
         new_forward = cp_wrap_attention_forward(value)
         if check_already_patched(value, new_forward):
@@ -255,9 +259,10 @@ def cp_wrap_attention_forward(forward_fn):
         query = stop_gradient(query)
         key = stop_gradient(key)
 
-        if 'dropout' in kwargs:
-            kwargs['dropout'] = 0.0
+        if "dropout" in kwargs:
+            kwargs["dropout"] = 0.0
         return forward_fn(module, query, key, value, *args, **kwargs)
+
     return cp_attention_forward
 
 
@@ -278,6 +283,6 @@ def cp_gated_mlp_forward(self, x):
     """
     gate_out = stop_gradient(self.gate_proj(x))
     gate_out = self.act_fn(gate_out)
-    
+
     weighted = gate_out * self.up_proj(x)
     return self.down_proj(weighted)

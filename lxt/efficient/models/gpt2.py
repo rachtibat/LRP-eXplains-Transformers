@@ -14,6 +14,7 @@ def mlp_forward(self, hidden_states):
     hidden_states = self.c_proj(hidden_states)
     return hidden_states
 
+
 attnLRP = {
     GPT2MLP: partial(patch_method, mlp_forward),
     modeling_gpt2.nn.LayerNorm: partial(patch_method, layer_norm_forward),
@@ -21,12 +22,12 @@ attnLRP = {
     modeling_gpt2: patch_attention,
 }
 
-# CP-LRP is easier to use for GPT2, because GPT2 has negative logit values 
+# CP-LRP is easier to use for GPT2, because GPT2 has negative logit values
 # and for AttnLRP we must also explain the softmax to kick out the negative bias
 # so, we set cp_LRP as default for the average LXT users
 cp_LRP = {
     GPT2MLP: partial(patch_method, mlp_forward),
     modeling_gpt2.nn.LayerNorm: partial(patch_method, layer_norm_forward),
     Dropout: partial(patch_method, dropout_forward),
-    modeling_gpt2: patch_cp_attention, # only difference to attnLRP
+    modeling_gpt2: patch_cp_attention,  # only difference to attnLRP
 }

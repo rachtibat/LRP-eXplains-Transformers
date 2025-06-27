@@ -17,18 +17,19 @@ import open_clip.transformer
 #####################
 
 # must be traced because of the functions, e.g. operator.add!
-attnlrp = Composite({
+attnlrp = Composite(
+    {
         nn.MultiheadAttention: lm.MultiheadAttention_CP,
         # order matters! lm.LinearInProjection is inside lm.MultiheadAttention_CP
         lm.LinearInProjection: rules.EpsilonRule,
         lm.LinearOutProjection: rules.EpsilonRule,
         open_clip.transformer.LayerNorm: lm.LayerNormEpsilon,
         nn.GELU: rules.IdentityRule,
-        
         operator.add: lf.add2,
         operator.matmul: lf.matmul,
         F.normalize: lf.normalize,
-    })
+    }
+)
 
 #####################
 ### Example Usage ###
@@ -42,18 +43,24 @@ if __name__ == "__main__":
     import zennit.rules as z_rules
     from zennit.image import imgify
 
-    device = 'cuda'
+    device = "cuda"
 
     # Load the model and the tokenizer
-    model, _, preprocess = open_clip.create_model_and_transforms('ViT-g-14', pretrained='laion2b_s34b_b88k')
+    model, _, preprocess = open_clip.create_model_and_transforms(
+        "ViT-g-14", pretrained="laion2b_s34b_b88k"
+    )
     model.eval()
     model = model.to(device)
 
-    tokenizer = open_clip.get_tokenizer('ViT-g-14')
+    tokenizer = open_clip.get_tokenizer("ViT-g-14")
 
     # Load an image and tokenize a text
-    text = tokenizer(['a beautiful LRP heatmap', 'a dog', 'a cat']).to(device)
-    image = preprocess(Image.open('docs/source/_static/cat_dog.jpg')).unsqueeze(0).to(device)
+    text = tokenizer(["a beautiful LRP heatmap", "a dog", "a cat"]).to(device)
+    image = (
+        preprocess(Image.open("docs/source/_static/cat_dog.jpg"))
+        .unsqueeze(0)
+        .to(device)
+    )
 
     # trace the model with a dummy input
     # verbose=True prints all functions/layers found and replaced by LXT
@@ -61,21 +68,27 @@ if __name__ == "__main__":
     # because this function is not used in the backward pass and therefore does not need to be replaced.
     # (look into the open_clip.transformer module code!)
     x = torch.randn(1, 3, 224, 224, device=device)
-    traced = attnlrp.register(model, dummy_inputs={'image': x, 'text': text}, verbose=True)
+    traced = attnlrp.register(
+        model, dummy_inputs={"image": x, "text": text}, verbose=True
+    )
 
     # for Vision Transformer, we must perform a grid search for the best gamma hyperparameters
     # in general, it is enough to concentrate on the Conv2d and MLP layers
     # for simplicity we just use a few values that can be evaluated by hand & looking at the heatmaps
     heatmaps = []
-    for conv_gamma, lin_gamma in itertools.product([0.1, 0.5, 100], [0, 0.01, 0.05, 0.1, 1]):
+    for conv_gamma, lin_gamma in itertools.product(
+        [0.1, 0.5, 100], [0, 0.01, 0.05, 0.1, 1]
+    ):
 
         print("Gamma Conv2d:", conv_gamma, "Gamma Linear:", lin_gamma)
 
         # we define rules for the Conv2d and Linear layers using 'Zennit'
-        zennit_comp = LayerMapComposite([
+        zennit_comp = LayerMapComposite(
+            [
                 (nn.Conv2d, z_rules.Gamma(conv_gamma)),
                 (nn.Linear, z_rules.Gamma(lin_gamma)),
-            ])
+            ]
+        )
 
         # register composite
         zennit_comp.register(traced)
@@ -97,5 +110,4 @@ if __name__ == "__main__":
         zennit_comp.remove()
 
     # save the heatmaps as a grid
-    imgify(heatmaps, vmin=-1, vmax=1, grid=(3, 5)).save('heatmap.png')
-
+    imgify(heatmaps, vmin=-1, vmax=1, grid=(3, 5)).save("heatmap.png")
