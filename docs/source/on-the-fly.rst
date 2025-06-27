@@ -75,7 +75,7 @@ Then, we'd like to apply the :math:`\varepsilon`-LRP on the linear layer and the
     lrp = Composite({
         nn.Linear: rules.EpsilonRule,
         RootMeanSquareNorm: rules.IdentityRule,
-    }, verbose=True)
+    })
     
     # wrap modules in LXT rules and show the progress
     lrp.register(model, verbose=True)
