@@ -46,15 +46,17 @@ def check_already_patched(target_fn, new_fn):
     return False
 
 
-def patch_method(fn, module, method_name="forward", keep_original=False):
+def patch_method(
+    patched_method, original_module, method_name="forward", keep_original=False
+):
     """
     Patch a method in a module with a new function.
 
     Parameters
     ----------
-    fn : function
+    patched_method : function
         The function to replace the method with.
-    module : module
+    original_module : module
         The module containing the method to be patched.
     method_name : str, optional
         The name of the method to be patched. Default is "forward".
@@ -68,12 +70,14 @@ def patch_method(fn, module, method_name="forward", keep_original=False):
         True if the method was successfully patched, False otherwise.
     """
 
-    if check_already_patched(getattr(module, method_name), fn):
+    if check_already_patched(getattr(original_module, method_name), patched_method):
         return False
     if keep_original:
-        setattr(module, f"original_{method_name}", getattr(module, method_name))
+        setattr(
+            original_module, f"original_{method_name}", getattr(old_module, method_name)
+        )
 
-    setattr(module, method_name, fn)
+    setattr(original_module, method_name, patched_method)
     return True
 
 
