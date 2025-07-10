@@ -1,27 +1,22 @@
 import torch
 from transformers import AutoTokenizer
-from transformers.models.qwen2 import modeling_qwen2
+from transformers.models.qwen3 import modeling_qwen3
 from transformers import BitsAndBytesConfig
 
 from lxt.efficient import monkey_patch
 from lxt.utils import pdf_heatmap, clean_tokens
 
-# modify the Qwen2 module to compute LRP in the backward pass
-monkey_patch(modeling_qwen2, verbose=True)
+# modify the Qwen3 module to compute LRP in the backward pass
+monkey_patch(modeling_qwen3, verbose=True)
 
-# optional 4bit quantization
+# optional 4bit quantization 
 quantization_config = BitsAndBytesConfig(
     load_in_4bit=True,
-    bnb_4bit_compute_dtype=torch.bfloat16,  # use bfloat16 to prevent overflow in gradients
+    bnb_4bit_compute_dtype=torch.bfloat16, # use bfloat16 to prevent overflow in gradients
 )
 
-path = "Qwen/Qwen2.5-1.5B-Instruct"
-model = modeling_qwen2.Qwen2ForCausalLM.from_pretrained(
-    path,
-    device_map="cuda",
-    torch_dtype=torch.bfloat16,
-    quantization_config=quantization_config,
-)
+path = 'Qwen/Qwen3-1.7B'
+model = modeling_qwen3.Qwen3ForCausalLM.from_pretrained(path, device_map='cuda', torch_dtype=torch.bfloat16, quantization_config=quantization_config)
 
 # optional gradient checkpointing to save memory (2x forward pass)
 model.train()
@@ -37,25 +32,19 @@ prompt = """Context: Mount Everest attracts many climbers, including highly expe
 Question: How high did they climb in 1922? According to the text, the 1922 expedition reached 8,"""
 
 # get input embeddings so that we can compute gradients w.r.t. input embeddings
-input_ids = tokenizer(
-    prompt, return_tensors="pt", add_special_tokens=True
-).input_ids.to(model.device)
+input_ids = tokenizer(prompt, return_tensors="pt", add_special_tokens=True).input_ids.to(model.device)
 input_embeds = model.get_input_embeddings()(input_ids)
 
 # inference and get the maximum logit at the last position (we can also explain other tokens)
-output_logits = model(
-    inputs_embeds=input_embeds.requires_grad_(), use_cache=False
-).logits
+output_logits = model(inputs_embeds=input_embeds.requires_grad_(), use_cache=False).logits
 max_logits, max_indices = torch.max(output_logits[0, -1, :], dim=-1)
 
 # Backward pass (the relevance is initialized with the value of max_logits)
 # This initiates the LRP computation through the network
 max_logits.backward()
 
-# obtain relevance by computing Gradient * Input
-relevance = (
-    (input_embeds.grad * input_embeds).float().sum(-1).detach().cpu()[0]
-)  # cast to float32 before summation for higher precision
+# obtain relevance by computing Input * Gradient
+relevance = (input_embeds * input_embeds.grad).float().sum(-1).detach().cpu()[0] # cast to float32 before summation for higher precision
 
 # normalize relevance between [-1, 1] for plotting
 relevance = relevance / relevance.abs().max()
@@ -64,6 +53,7 @@ relevance = relevance / relevance.abs().max()
 tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
 tokens = clean_tokens(tokens)
 
-pdf_heatmap(
-    tokens, relevance, path="qwen2.5_1.5B_instruct_heatmap.pdf", backend="pdflatex"
-)  # backend='xelatex' supports more characters
+pdf_heatmap(tokens, relevance, path='qwen3_1.7B_heatmap.pdf', backend='xelatex') # backend='xelatex' supports more characters
+
+# plot again without first token, because it receives large relevance values overshadowing the rest
+pdf_heatmap(tokens[1:], relevance[1:] / relevance[1:].max(), path='qwen3_1.7B_heatmap_wo_first.pdf', backend='xelatex')

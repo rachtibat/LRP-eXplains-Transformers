@@ -1,13 +1,13 @@
 import torch
 from transformers import AutoTokenizer
-from transformers.models.llama import modeling_llama
+from transformers.models.qwen2 import modeling_qwen2
 from transformers import BitsAndBytesConfig
 
 from lxt.efficient import monkey_patch
 from lxt.utils import pdf_heatmap, clean_tokens
 
-# modify the LLaMA module to compute LRP in the backward pass
-monkey_patch(modeling_llama, verbose=True)
+# modify the Qwen2 module to compute LRP in the backward pass
+monkey_patch(modeling_qwen2, verbose=True)
 
 # optional 4bit quantization
 quantization_config = BitsAndBytesConfig(
@@ -15,8 +15,8 @@ quantization_config = BitsAndBytesConfig(
     bnb_4bit_compute_dtype=torch.bfloat16,  # use bfloat16 to prevent overflow in gradients
 )
 
-path = "meta-llama/Llama-3.2-1B-Instruct"
-model = modeling_llama.LlamaForCausalLM.from_pretrained(
+path = "Qwen/Qwen2.5-1.5B-Instruct"
+model = modeling_qwen2.Qwen2ForCausalLM.from_pretrained(
     path,
     device_map="cuda",
     torch_dtype=torch.bfloat16,
@@ -52,9 +52,9 @@ max_logits, max_indices = torch.max(output_logits[0, -1, :], dim=-1)
 # This initiates the LRP computation through the network
 max_logits.backward()
 
-# obtain relevance by computing Input * Gradient
+# obtain relevance by computing Gradient * Input
 relevance = (
-    (input_embeds * input_embeds.grad).float().sum(-1).detach().cpu()[0]
+    (input_embeds.grad * input_embeds).float().sum(-1).detach().cpu()[0]
 )  # cast to float32 before summation for higher precision
 
 # normalize relevance between [-1, 1] for plotting
@@ -65,5 +65,5 @@ tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
 tokens = clean_tokens(tokens)
 
 pdf_heatmap(
-    tokens, relevance, path="llama_3.2_1B_instruct_heatmap.pdf", backend="xelatex"
+    tokens, relevance, path="qwen2.5_1.5B_heatmap.pdf", backend="pdflatex"
 )  # backend='xelatex' supports more characters
