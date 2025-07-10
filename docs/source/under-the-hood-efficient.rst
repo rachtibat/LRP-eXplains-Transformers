@@ -1,5 +1,5 @@
 .. _under_the_hood_efficient:
-How does the Gradient*Input Framework work?
+How does the Input*Gradient Framework work?
 ============================================
 
 Since LRP is a backpropagation-based method, it is possible to compute attributions in a single backward pass.
