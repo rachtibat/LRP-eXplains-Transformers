@@ -10,13 +10,11 @@ This is a not exhaustive list of models that are supported in the efficient LXT 
 For a complete list of models, please look into ``lxt.efficient.models``.
 
 - LLaMA
-- Qwen
+- Qwen 2/3
+- Gemma 3
 - BERT
 - GPT2
 - torchvision ViT
-
-Coming soon:
-- Gemma
 
 
 Extending LXT

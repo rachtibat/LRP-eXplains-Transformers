@@ -2,18 +2,56 @@
   <img src="docs/source/_static/lxt_logo.png" width="300"/>
 
   <h3>Layer-wise Relevance Propagation for Transformers</h3>
+  <p><i>Fast, faithful explanations for transformer models with a single backward pass</i></p>
   <p><i></i></p>
 
   [![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)](https://pytorch.org)
   [![Read the Docs](https://img.shields.io/badge/-Docs-blue?style=for-the-badge&logo=Read-the-Docs&logoColor=white)](https://lxt.readthedocs.io)
   [![License](https://img.shields.io/badge/License-BSD_3--Clause-green.svg?style=for-the-badge)](https://opensource.org/licenses/BSD-3-Clause)
+  [![Downloads](https://img.shields.io/pypi/dm/lxt.svg?style=for-the-badge)](https://pypi.org/project/lxt/)
 </div>
+
+
+## Table of Contents
+- [What is LXT?](#✨-what-is-lxt)
+- [Getting Started](#getting-started)
+- [Supported Models](#🧩-supported-models)
+- [How LXT Works](#how-lxt-works)
+- [Documentation](#documentation)
+- [Citation](#citation)
 
 ## Accelerating eXplainable AI research for LLMs & ViTs
 
+#### ✨ What is LXT?
+
+LXT makes black-box transformer models explainable by precisely revealing how much each input token and individual neuron contribute to the final prediction logit. Unlike standard gradient-based methods, which can be noisy or unreliable, LXT delivers faithful attributions using AttnLRP, a backpropagation-based technique that corrects gradient flow through non-linearities. Best of all, it requires only a single backward pass.
+
+See the dramatic improvement in explanation quality on Gemma 3 (4B):
+
+<div align="center">
+  <table>
+    <tr>
+      <th>Input×Gradient (Traditional)</th>
+      <th>AttnLRP (Our Method)</th>
+    </tr>
+    <tr>
+      <td>
+        <img src="docs/source/_static/gemma_3_4b_it_gradient.jpg" alt="Input×Gradient results showing noisy, scattered attributions" width="400"/>
+        <br>
+        <em>Noisy, scattered attributions</em>
+      </td>
+      <td>
+        <img src="docs/source/_static/gemma_3_4b_it_LXT.jpg" alt="AttnLRP results showing clean, semantically coherent attributions" width="400"/>
+        <br>
+        <em>Clean, semantically coherent attributions</em>
+      </td>
+    </tr>
+  </table>
+</div>
+
 #### 🔥 Highly efficient & Faithful Attributions
 
-Attention-aware LRP (AttnLRP) **outperforms** gradient-, decomposition- and perturbation-based methods, provides faithful attributions for the **entirety** of a black-box transformer model while scaling in computational complexitiy $O(1)$ and memory requirements $O(\sqrt{N})$ with respect to the number of layers.
+Attention-aware LRP (AttnLRP) **outperforms** gradient-, decomposition- and perturbation-based methods, provides faithful attributions for the **entirety** of a black-box transformer model while scaling in computational complexity $O(1)$ and memory requirements $O(\sqrt{N})$ with respect to the number of layers.
 
 #### 🔎 Latent Feature Attribution & Visualization
 Since we get relevance values for each single neuron in the model as a by-product, we know exactly how important each neuron is for the prediction of the model. Combined with Activation Maximization, we can label neurons or SAE features in LLMs and even steer the generation process of the LLM by activating specialized knowledge neurons in latent space!
@@ -23,7 +61,7 @@ For the mathematical details and foundational work, please take a look at our pa
 [Achtibat, et al. “AttnLRP: Attention-Aware Layer-Wise Relevance Propagation for Transformers.” ICML 2024.](https://proceedings.mlr.press/v235/achtibat24a.html)  
 
 #### 🏆 Hall of Fame
-A collection of papers that have utilized LXT:
+A small collection of papers that have utilized LXT:
 
 - [Arras, et al. “Close Look at Decomposition-based XAI-Methods for Transformer Language Models.” arXiv preprint, 2025.](https://arxiv.org/abs/2502.15886)
 - [Pan, et al. “The Hidden Dimensions of LLM Alignment: A Multi-Dimensional Safety Analysis.” arXiv preprint, 2025.](https://arxiv.org/abs/2502.09674)
@@ -42,11 +80,24 @@ This project is licensed under the BSD-3 Clause License, which means that LRP is
 pip install lxt
 ```
 
-Tested with: `transformers==4.48.3`, `torch==2.6.0`, `python==3.11`
+Tested with: `transformers==4.52.4`, `torch==2.6.0`, `python==3.11`
 
-### 🚀 Quickstart with 🤗 LLaMA, BERT, GPT2, Qwen, Mixtral & many more
+### 🚀 Quickstart with 🤗 LLaMA & many more
 You find example scripts in the `examples/*` directory. For an in-depth tutorial, take a look at the [Quickstart in the Documentation](https://lxt.readthedocs.io/en/latest/quickstart.html).
+
 To get an overview, you can keep reading below ⬇️
+
+### 🧩 Supported Models
+
+| Model Family | Status |
+|--------------|--------|
+| 🦙 LLaMA 2/3 | ✅ |
+| ✨ Gemma 3 | ✅ |
+| 🤖 Qwen 2 | ✅ |
+| 🧠 Qwen 3 | 🧪 Attribution skewed toward first token |
+| 🔤 BERT | ✅ |
+| 🤖 GPT-2 | ✅ Best paired with contrastive explanations |
+| 🎨 Vision Transformers | ✅ |
 
 
 ## How LXT Works
@@ -55,7 +106,7 @@ Layer-wise Relevance Propagation is a rule-based backpropagation algorithm. This
 For this, LXT offers two different approaches:
 
 ### 1. Efficient Implementation
-Uses a Gradient*Input formulation, which simplifies LRP to a standard & fast gradient computation via monkey patching the model class.
+Uses a Input*Gradient formulation, which simplifies LRP to a standard & fast gradient computation via monkey patching the model class.
 
 
 ```python
@@ -70,9 +121,9 @@ outputs = model(inputs_embeds=input_embeds.requires_grad_())
 # Backward pass
 outputs.logits[...].backward()
 
-# Get relevance at *ANY LAYER* in your model. Simply multiply the gradient * activation!
+# Get relevance at *ANY LAYER* in your model. Simply multiply the activation * gradient!
 # here for the input embeddings:
-relevance = (input_embeds.grad * input_embeds).sum(-1)
+relevance = (input_embeds * input_embeds.grad).sum(-1)
 ```
 This is the **recommended approach** for most users as it's significantly faster and easier to use. This implementation technique is introduced in [Arras, et al. “Close Look at Decomposition-based XAI-Methods for Transformer Language Models.” arXiv preprint, 2025.](https://arxiv.org/abs/2502.15886)
  
@@ -113,7 +164,7 @@ print(model)
 </div>
 
 
-## Documentaion
+## Documentation
 [Click here](https://lxt.readthedocs.io) to read the documentation.
 
 ## Contribution

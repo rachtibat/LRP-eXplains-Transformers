@@ -53,4 +53,4 @@ relevance = relevance / relevance.abs().max()
 tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
 tokens = clean_tokens(tokens)
 
-pdf_heatmap(tokens, relevance, path='qwen2.5_1.5B_instruct_heatmap.pdf', backend='pdflatex') # backend='xelatex' supports more characters
+pdf_heatmap(tokens, relevance, path='qwen2.5_1.5B_heatmap.pdf', backend='pdflatex') # backend='xelatex' supports more characters

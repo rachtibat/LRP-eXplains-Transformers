@@ -1,13 +1,13 @@
 import torch
 from transformers import AutoTokenizer
-from transformers.models.llama import modeling_llama
+from transformers.models.qwen3 import modeling_qwen3
 from transformers import BitsAndBytesConfig
 
 from lxt.efficient import monkey_patch
 from lxt.utils import pdf_heatmap, clean_tokens
 
-# modify the LLaMA module to compute LRP in the backward pass
-monkey_patch(modeling_llama, verbose=True)
+# modify the Qwen2 module to compute LRP in the backward pass
+monkey_patch(modeling_qwen3, verbose=True)
 
 # optional 4bit quantization 
 quantization_config = BitsAndBytesConfig(
@@ -15,8 +15,8 @@ quantization_config = BitsAndBytesConfig(
     bnb_4bit_compute_dtype=torch.bfloat16, # use bfloat16 to prevent overflow in gradients
 )
 
-path = 'meta-llama/Llama-3.2-1B-Instruct'
-model = modeling_llama.LlamaForCausalLM.from_pretrained(path, device_map='cuda', torch_dtype=torch.bfloat16, quantization_config=quantization_config)
+path = 'Qwen/Qwen3-1.7B'
+model = modeling_qwen3.Qwen3ForCausalLM.from_pretrained(path, device_map='cuda', torch_dtype=torch.bfloat16, quantization_config=quantization_config)
 
 # optional gradient checkpointing to save memory (2x forward pass)
 model.train()
@@ -53,4 +53,7 @@ relevance = relevance / relevance.abs().max()
 tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
 tokens = clean_tokens(tokens)
 
-pdf_heatmap(tokens, relevance, path='llama_3.2_1B_instruct_heatmap.pdf', backend='xelatex') # backend='xelatex' supports more characters
+pdf_heatmap(tokens, relevance, path='qwen3_1.7B_heatmap.pdf', backend='xelatex') # backend='xelatex' supports more characters
+
+# plot again without first token, because it receives large relevance values overshadowing the rest
+pdf_heatmap(tokens[1:], relevance[1:] / relevance[1:].max(), path='qwen3_1.7B_heatmap_wo_first.pdf', backend='xelatex')
