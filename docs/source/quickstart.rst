@@ -2,7 +2,7 @@
 
 Quickstart
 ======================
-In this tutorial, we will focus on the Gradient*Input formulation of Attention-aware Layer-wise Relevance Propagation (AttnLRP).
+In this tutorial, we will focus on the Input*Gradient formulation of Attention-aware Layer-wise Relevance Propagation (AttnLRP).
 This implementation is identical to the original one introduced in the AttnLRP paper, but more efficient and leverages the automatic differentiation capabilities of PyTorch more natively.
 To understand how it works under the hood, please refer to the :ref:`under_the_hood_efficient` section.
 
@@ -304,7 +304,7 @@ For simplicity, we select a few values that can be manually evaluated by looking
 
 For that, we use the library ``zennit`` to define rules for the Conv2d and Linear layers, because LXT does not support the ``Gamma`` rule yet and
 ``zennit`` has more rules to choose from, e.g. ``ZPlus``, ``AlphaBeta``, ``Epsilon`` etc. Since ``zennit`` uses an explicit formulation of LRP (see :ref:`explicit_quickstart`),
-we need to monkey patch to transform it into the Gradient*input formulation.
+we need to monkey patch to transform it into the Input*Gradient formulation.
 
 Hence, please install
 
@@ -405,7 +405,7 @@ Now we load the model, define a zennit composite and try out different values fo
         # Remove the registered composite to prevent interference in future iterations
         zennit_comp.remove()
         
-        # Calculate the relevance by computing Gradient * Input
+        # Calculate the relevance by computing Input*Gradient
         # This is the final step of LRP to get the pixel-wise explanation
         heatmap = (input_tensor * input_tensor.grad).sum(1)
         
