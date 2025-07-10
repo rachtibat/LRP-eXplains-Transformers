@@ -43,8 +43,8 @@ max_logits, max_indices = torch.max(output_logits[0, -1, :], dim=-1)
 # This initiates the LRP computation through the network
 max_logits.backward()
 
-# obtain relevance by computing Gradient * Input
-relevance = (input_embeds.grad * input_embeds).float().sum(-1).detach().cpu()[0] # cast to float32 before summation for higher precision
+# obtain relevance by computing Input * Gradient
+relevance = (input_embeds * input_embeds.grad).float().sum(-1).detach().cpu()[0] # cast to float32 before summation for higher precision
 
 # normalize relevance between [-1, 1] for plotting
 relevance = relevance / relevance.abs().max()
@@ -53,4 +53,4 @@ relevance = relevance / relevance.abs().max()
 tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
 tokens = clean_tokens(tokens)
 
-pdf_heatmap(tokens, relevance, path='llama_3.2_1B_instruct_heatmap.pdf', backend='pdflatex') # backend='xelatex' supports more characters
+pdf_heatmap(tokens, relevance, path='llama_3.2_1B_instruct_heatmap.pdf', backend='xelatex') # backend='xelatex' supports more characters
