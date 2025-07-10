@@ -13,9 +13,9 @@
 
 
 ## Table of Contents
-- [What is LXT?](#✨-what-is-lxt)
+- [What is LXT?](#-what-is-lxt)
 - [Getting Started](#getting-started)
-- [Supported Models](#🧩-supported-models)
+- [Supported Models](#-supported-models)
 - [How LXT Works](#how-lxt-works)
 - [Documentation](#documentation)
 - [Citation](#citation)
