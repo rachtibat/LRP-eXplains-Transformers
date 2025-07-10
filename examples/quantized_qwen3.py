@@ -6,7 +6,7 @@ from transformers import BitsAndBytesConfig
 from lxt.efficient import monkey_patch
 from lxt.utils import pdf_heatmap, clean_tokens
 
-# modify the Qwen2 module to compute LRP in the backward pass
+# modify the Qwen3 module to compute LRP in the backward pass
 monkey_patch(modeling_qwen3, verbose=True)
 
 # optional 4bit quantization 
