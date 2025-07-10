@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='lxt',  
-    version='2.0',
+    version='2.1',
     install_requires=[
         'torch',
         'transformers',
