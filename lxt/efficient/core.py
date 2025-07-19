@@ -41,3 +41,42 @@ def monkey_patch(module, patch_map=None, verbose=False):
             warn(f"Failed to patch {target.__name__}. Skipping...")
         elif verbose:
             print(f"Patched {target.__name__}")
+
+
+def zero_bias(model):
+    """
+    This function modifies your model to verify that
+
+    Parameters:
+    ----------
+    model: Pytorch model
+        The monkey_patch/modified model to zero the biases for. Key assumptions: all linear layers are initiated with torch.nn.Linear,
+        all LayerNorms are initialized with torch.nn.LayerNorm, and all softmaxs are initiated with torch.nn.Softmax.
+        A key point to note is that the model must already have modified the forward pass for all nonlinear activations on the inputs
+        and for any bilinear matrix multiplications (any matrix multiplication that has components that can be traced back to the input
+        embeddings. E.g. H*W_q x H*W_k in multiplying queries and keys in the standard attention mechanism (SDPA)).
+        To verify that conservation truly holds for your model, confirm that the output logit in the model is approximately the same as
+        the input summed across the embedding dimension.
+    """
+    import torch.nn as nn
+    from torch.nn import Linear, LayerNorm, Softmax
+
+    class DetachedSoftmax(nn.Module):
+        def __init__(self, original_softmax):
+            super().__init__()
+            self.softmax = original_softmax
+
+        def forward(self, x):
+            return self.softmax(x).detach()
+
+    for name, module in model.named_modules():
+        if isinstance(module, Linear) or isinstance(module, LayerNorm):
+            module.bias = None
+
+        if isinstance(module, Softmax):
+            parent = model
+            attrs = name.split(".")
+            for attr in attrs[:-1]:
+                parent = getattr(parent, attr)
+
+            setattr(parent, attrs[-1], DetachedSoftmax(module))
