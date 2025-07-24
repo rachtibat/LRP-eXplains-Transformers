@@ -32,9 +32,11 @@ def conservation_check_wrap(func):
                 raise ValueError(f"NaN at {func}")
 
             inp_relevance = tuple(
-                torch.full(r.shape, inp_rel_mean).to(r.device)
-                if r is not None
-                else None
+                (
+                    torch.full(r.shape, inp_rel_mean).to(r.device)
+                    if r is not None
+                    else None
+                )
                 for r in inp_relevance
             )
 

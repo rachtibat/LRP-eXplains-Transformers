@@ -120,6 +120,7 @@ class Phi3RMSNorm(nn.Module):
 
 ALL_LAYERNORM_LAYERS.append(RMSNormIdentity)
 
+
 # Copied from transformers.models.llama.modeling_llama._get_unpad_data
 def _get_unpad_data(attention_mask):
     seqlens_in_batch = attention_mask.sum(dim=-1, dtype=torch.int32)
@@ -198,7 +199,7 @@ class Phi3SuScaledRotaryEmbedding(Phi3RotaryEmbedding):
             torch.arange(0, self.dim, 2, dtype=torch.int64, device=x.device).float()
             / self.dim
         )
-        self.inv_freq = 1.0 / (ext_factors * self.base ** inv_freq_shape)
+        self.inv_freq = 1.0 / (ext_factors * self.base**inv_freq_shape)
 
         inv_freq_expanded = (
             self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1)
@@ -257,7 +258,7 @@ class Phi3YarnScaledRotaryEmbedding(Phi3RotaryEmbedding):
             torch.arange(0, self.dim, 2, dtype=torch.int64, device=x.device).float()
             / self.dim
         )
-        self.inv_freq = 1.0 / (ext_factors * self.base ** inv_freq_shape)
+        self.inv_freq = 1.0 / (ext_factors * self.base**inv_freq_shape)
 
         inv_freq_expanded = (
             self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1)

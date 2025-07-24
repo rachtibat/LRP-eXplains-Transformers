@@ -17,7 +17,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" PyTorch Mixtral model."""
+"""PyTorch Mixtral model."""
 import inspect
 import math
 import warnings
@@ -149,7 +149,7 @@ def load_balancing_loss_func(
     router_prob_per_group_and_expert = torch.mean(routing_weights, axis=-1)
     return torch.mean(
         tokens_per_group_and_expert * router_prob_per_group_and_expert.unsqueeze(-1)
-    ) * (num_experts ** 2)
+    ) * (num_experts**2)
 
 
 # Copied from transformers.models.llama.modeling_llama._get_unpad_data
