@@ -4,10 +4,12 @@ import os
 import subprocess
 from pathlib import Path
 
+
 def _apply_colormap(relevance, cmap):
-    
+
     colormap = cm.get_cmap(cmap)
     return colormap(colors.Normalize(vmin=-1, vmax=1)(relevance))
+
 
 def _generate_latex(words, relevances, cmap="bwr"):
     """
@@ -15,7 +17,7 @@ def _generate_latex(words, relevances, cmap="bwr"):
     """
 
     # Generate LaTeX code
-    latex_code = r'''
+    latex_code = r"""
     \documentclass[arwidth=200mm]{standalone} 
     \usepackage[dvipsnames]{xcolor}
     
@@ -23,49 +25,61 @@ def _generate_latex(words, relevances, cmap="bwr"):
     \fbox{
     \parbox{\textwidth}{
     \setlength\fboxsep{0pt}
-    '''
+    """
 
     for word, relevance in zip(words, relevances):
         rgb = _apply_colormap(relevance, cmap)
-        r, g, b = int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255)
+        r, g, b = int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255)
 
-        if word.startswith(' '):
-            latex_code += f' \\colorbox[RGB]{{{r},{g},{b}}}{{\\strut {word}}}'
+        if word.startswith(" "):
+            latex_code += f" \\colorbox[RGB]{{{r},{g},{b}}}{{\\strut {word}}}"
         else:
-            latex_code += f'\\colorbox[RGB]{{{r},{g},{b}}}{{\\strut {word}}}'
+            latex_code += f"\\colorbox[RGB]{{{r},{g},{b}}}{{\\strut {word}}}"
 
-
-    latex_code += r'}}\end{document}'
+    latex_code += r"}}\end{document}"
 
     return latex_code
 
-    
-def _compile_latex_to_pdf(latex_code, path='word_colors.pdf', delete_aux_files=True, backend='xelatex'):
+
+def _compile_latex_to_pdf(
+    latex_code, path="word_colors.pdf", delete_aux_files=True, backend="xelatex"
+):
     """
     Compile LaTeX code to a PDF file using pdflatex or xelatex.
     """
-    
+
     # Save LaTeX code to a file
     path = Path(path)
     os.makedirs(path.parent, exist_ok=True)
 
-    with open(path.with_suffix(".tex"), 'w') as f:
+    with open(path.with_suffix(".tex"), "w") as f:
         f.write(latex_code)
 
     # Use pdflatex to generate PDF file
-    if backend == 'pdflatex':
-        subprocess.call(['pdflatex', '--output-directory', path.parent, path.with_suffix(".tex")])
-    elif backend == 'xelatex':
-        subprocess.call(['xelatex', '--output-directory', path.parent, path.with_suffix(".tex")])
+    if backend == "pdflatex":
+        subprocess.call(
+            ["pdflatex", "--output-directory", path.parent, path.with_suffix(".tex")]
+        )
+    elif backend == "xelatex":
+        subprocess.call(
+            ["xelatex", "--output-directory", path.parent, path.with_suffix(".tex")]
+        )
 
     print("PDF file generated successfully.")
 
     if delete_aux_files:
-        for suffix in ['.aux', '.log', '.tex']:
+        for suffix in [".aux", ".log", ".tex"]:
             os.remove(path.with_suffix(suffix))
 
 
-def pdf_heatmap(words, relevances, cmap="bwr", path='heatmap.pdf', delete_aux_files=True, backend='xelatex'):
+def pdf_heatmap(
+    words,
+    relevances,
+    cmap="bwr",
+    path="heatmap.pdf",
+    delete_aux_files=True,
+    backend="xelatex",
+):
     """
     Generate a PDF file with a heatmap of the relevances of the words in a sentence using LaTeX.
 
@@ -85,11 +99,17 @@ def pdf_heatmap(words, relevances, cmap="bwr", path='heatmap.pdf', delete_aux_fi
         The LaTeX backend to use (pdflatex or xelatex).
     """
 
-    assert len(words) == len(relevances), "The number of words and relevances must be the same."
-    assert relevances.min() >= -1 and relevances.max() <= 1, "The relevances must be normalized between -1 and 1."
+    assert len(words) == len(
+        relevances
+    ), "The number of words and relevances must be the same."
+    assert (
+        relevances.min() >= -1 and relevances.max() <= 1
+    ), "The relevances must be normalized between -1 and 1."
 
     latex_code = _generate_latex(words, relevances, cmap=cmap)
-    _compile_latex_to_pdf(latex_code, path=path, delete_aux_files=delete_aux_files, backend=backend)
+    _compile_latex_to_pdf(
+        latex_code, path=path, delete_aux_files=delete_aux_files, backend=backend
+    )
 
 
 def clean_tokens(words):
@@ -99,22 +119,23 @@ def clean_tokens(words):
 
     if any("▁" in word for word in words):
         words = [word.replace("▁", " ") for word in words]
-    
+
     elif any("Ġ" in word for word in words):
         words = [word.replace("Ġ", " ") for word in words]
-    
+
     elif any("##" in word for word in words):
-        words = [word.replace("##", "") if "##" in word else " " + word for word in words]
+        words = [
+            word.replace("##", "") if "##" in word else " " + word for word in words
+        ]
         words[0] = words[0].strip()
 
     else:
         raise ValueError("The tokenization scheme is not recognized.")
-    
-    special_characters = ['&', '%', '$', '#', '_', '{', '}', '\\']
+
+    special_characters = ["&", "%", "$", "#", "_", "{", "}", "\\"]
     for i, word in enumerate(words):
         for special_character in special_characters:
             if special_character in word:
-                words[i] = word.replace(special_character, '\\' + special_character)
+                words[i] = word.replace(special_character, "\\" + special_character)
 
     return words
-

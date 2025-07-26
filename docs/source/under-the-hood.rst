@@ -15,7 +15,7 @@ For instance, the :math:`\varepsilon`-LRP rule for linear layers :math:`z = W x 
    R^{l-1} = x \odot W^T \cdot \frac{R^l}{z + \varepsilon}
 
 
-In ``lxt.functional``, we define a custom Autograd Function that applies the standard ``torch.nn.functional.linear`` function in the forward pass, but our LRP rule in the backward pass:
+In ``lxt.explicit.functional``, we define a custom Autograd Function that applies the standard ``torch.nn.functional.linear`` function in the forward pass, but our LRP rule in the backward pass:
 
 .. code-block:: python
 
@@ -75,7 +75,7 @@ How was the Quickstart demo created?
 So that LXT works properly, you have to replace **all** operations where the gradient is not equal to a relevance propagation rule.
 For instance, in many projects you will find a line of code adding two tensors, such as ``hidden_states = hidden_states + residual``.
 
-With LXT, we must replace this line of code with ``hidden_states = lxt.functional.add2(hidden_states, residual)``. 
+With LXT, we must replace this line of code with ``hidden_states = lxt.explicit.functional.add2(hidden_states, residual)``. 
 For the Quickstart demos, we edited the huggingface source-code and replaced all operations that needed to be changed. 
 
 In addition, LXT provides the capability to dynamically modify a portion of the source code. This functionality can be achieved by utilizing the ``Composite`` class, which is described in detail in :ref:`on_the_fly`. 

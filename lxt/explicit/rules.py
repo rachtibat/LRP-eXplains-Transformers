@@ -5,6 +5,7 @@ from lxt.explicit.functional import _stabilize, conservation_check_wrap
 from torch.func import jvp, vjp
 import torch.fx
 
+
 class WrapModule(nn.Module):
     """
     Base class for wrapping a rule around a module. This class is not meant to be used directly, but to be subclassed by specific rules.
@@ -33,7 +34,7 @@ class IdentityRule(WrapModule):
     def forward(self, input):
 
         return identity_fn.apply(self.module, input)
-    
+
 
 def identity(fn, input):
     """
@@ -76,7 +77,7 @@ class identity_fn(Function):
     def backward(ctx, *out_relevance):
 
         return (None,) + out_relevance
-    
+
 
 class StopRelevanceRule(WrapModule):
     """
@@ -94,7 +95,7 @@ class StopRelevanceRule(WrapModule):
     def forward(self, input):
 
         return stop_relevance_fn.apply(self.module, input)
-    
+
 
 class stop_relevance_fn(Function):
     """
@@ -139,13 +140,14 @@ class EpsilonRule(WrapModule):
     """
 
     def __init__(self, module, epsilon=1e-8):
-        
+
         super(EpsilonRule, self).__init__(module)
         self.epsilon = epsilon
 
     def forward(self, *inputs):
 
         return epsilon_lrp_fn.apply(self.module, self.epsilon, *inputs)
+
 
 @torch.fx.wrap
 def epsilon_lrp(fn, epsilon, *inputs):
@@ -188,14 +190,17 @@ class epsilon_lrp_fn(Function):
     def forward(ctx, fn, epsilon, *inputs):
 
         # create boolean mask for inputs requiring gradients
-        #TODO: use ctx.needs_input_grad instead of requires_grad
+        # TODO: use ctx.needs_input_grad instead of requires_grad
         requires_grads = [True if inp.requires_grad else False for inp in inputs]
         if sum(requires_grads) == 0:
             # no gradients to compute or gradient checkpointing is used
             return fn(*inputs)
-        
+
         # detach inputs to avoid overwriting gradients if same input is used as multiple arguments (like in self-attention)
-        inputs = tuple(inp.detach().requires_grad_() if inp.requires_grad else inp for inp in inputs)
+        inputs = tuple(
+            inp.detach().requires_grad_() if inp.requires_grad else inp
+            for inp in inputs
+        )
 
         with torch.enable_grad():
             outputs = fn(*inputs)
@@ -204,29 +209,31 @@ class epsilon_lrp_fn(Function):
         # save only inputs requiring gradients
         inputs = tuple(inputs[i] for i in range(len(inputs)) if requires_grads[i])
         ctx.save_for_backward(*inputs, outputs)
-        
+
         return outputs.detach()
-        
+
     @staticmethod
     @conservation_check_wrap
     def backward(ctx, *out_relevance):
 
         inputs, outputs = ctx.saved_tensors[:-1], ctx.saved_tensors[-1]
-        relevance_norm = out_relevance[0] / _stabilize(outputs, ctx.epsilon, inplace=False)
+        relevance_norm = out_relevance[0] / _stabilize(
+            outputs, ctx.epsilon, inplace=False
+        )
 
         # computes vector-jacobian product
         grads = torch.autograd.grad(outputs, inputs, relevance_norm)
 
         # return relevance at requires_grad indices else None
         relevance = iter([grads[i].mul_(inputs[i]) for i in range(len(inputs))])
-        return (None, None) + tuple(next(relevance) if req_grad else None for req_grad in ctx.requires_grads)
+        return (None, None) + tuple(
+            next(relevance) if req_grad else None for req_grad in ctx.requires_grads
+        )
 
-        
-    
 
 class UniformEpsilonRule(WrapModule):
     """
-    A sequential application of the input_x_gradient rule and the uniform rule to distribute the relevance uniformly to all inputs according to the uniform rule 
+    A sequential application of the input_x_gradient rule and the uniform rule to distribute the relevance uniformly to all inputs according to the uniform rule
     as discussed in Section 3.3.2. 'Handling Matrix-Multiplication' of the paper 'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'.
 
     If one of the inputs is a constant or does not require gradients, no relevance is distributed to it.
@@ -241,18 +248,18 @@ class UniformEpsilonRule(WrapModule):
     """
 
     def __init__(self, module, epsilon=1e-6):
-        
+
         super(UniformEpsilonRule, self).__init__(module)
         self.epsilon = epsilon
 
     def forward(self, *inputs):
 
         return uniform_epsilon_lrp_fn.apply(self.module, self.epsilon, *inputs)
-    
+
 
 class uniform_epsilon_lrp_fn(epsilon_lrp_fn):
     """
-    A sequential application of the input_x_gradient rule and the uniform rule to distribute the relevance uniformly to all inputs according to the uniform rule 
+    A sequential application of the input_x_gradient rule and the uniform rule to distribute the relevance uniformly to all inputs according to the uniform rule
     as discussed in Section 3.3.2. 'Handling Matrix-Multiplication' of the paper 'AttnLRP: Attention-Aware Layer-wise Relevance Propagation for Transformers'.
 
     If one of the inputs is a constant or does not require gradients, no relevance is distributed to it.
@@ -266,21 +273,25 @@ class uniform_epsilon_lrp_fn(epsilon_lrp_fn):
     *inputs: at least one torch.Tensor
         The input tensors to the function
     """
-        
+
     @staticmethod
     @conservation_check_wrap
     def backward(ctx, *out_relevance):
-    
+
         inputs, outputs = ctx.saved_tensors[:-1], ctx.saved_tensors[-1]
-        relevance_norm = out_relevance[0] / _stabilize(outputs, ctx.epsilon, inplace=False)
+        relevance_norm = out_relevance[0] / _stabilize(
+            outputs, ctx.epsilon, inplace=False
+        )
         relevance_norm = relevance_norm / len(inputs)
 
         # computes vector-jacobian product
         grads = torch.autograd.grad(outputs, inputs, relevance_norm)
 
         # return relevance at requires_grad indices else None
-        return (None, None) + tuple(grads[i].mul_(inputs[i]) if ctx.requires_grads[i] else None for i in range(len(ctx.requires_grads)))
-
+        return (None, None) + tuple(
+            grads[i].mul_(inputs[i]) if ctx.requires_grads[i] else None
+            for i in range(len(ctx.requires_grads))
+        )
 
 
 class TaylorDecompositionRule(WrapModule):
@@ -310,8 +321,9 @@ class TaylorDecompositionRule(WrapModule):
 
     def forward(self, *inputs):
 
-        return taylor_decomposition_fn.apply(self.module, self.ref, self.bias, self.distribute_bias, *inputs)
-
+        return taylor_decomposition_fn.apply(
+            self.module, self.ref, self.bias, self.distribute_bias, *inputs
+        )
 
 
 class taylor_decomposition_fn(Function):
@@ -337,7 +349,7 @@ class taylor_decomposition_fn(Function):
 
     @staticmethod
     def forward(ctx, fn, ref, bias, distribute_bias, *inputs):
-        
+
         output = fn(*inputs)
         ctx.save_for_backward(*inputs)
         ctx.fn, ctx.ref, ctx.bias = fn, ref, bias
@@ -356,13 +368,13 @@ class taylor_decomposition_fn(Function):
             # bias term is omitted in this way
             _, Jvs = jvp(ctx.fn, ctx.ref, inputs)
             output = Jvs
-        
+
         normed_relevance = out_relevance[0] / _stabilize(output, inplace=True)
 
         # compute jacobian at reference and multiply from left side with R/output
         _, vjpfunc = vjp(ctx.fn, *ctx.ref)
         grads = vjpfunc(normed_relevance)
-        
+
         relevances = tuple(grads[i].mul_(inputs[i]) for i in range(len(inputs)))
 
         if ctx.bias and callable(ctx.distribute_bias):
@@ -370,7 +382,7 @@ class taylor_decomposition_fn(Function):
 
         # multiply vJ with reference point
         return (None, None, None) + relevances
-    
+
 
 class UniformRule(WrapModule):
     """

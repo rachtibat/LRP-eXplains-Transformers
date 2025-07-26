@@ -5,12 +5,18 @@ from lxt.explicit.models.llama import LlamaForCausalLM, attnlrp
 from lxt.utils import pdf_heatmap, clean_tokens
 import transformers
 
-assert torch.__version__.startswith("2.1"), "PyTorch version must be 2.1. Code might not work with newer versions."
-assert transformers.__version__.startswith("4.46"), "Transformers version must be 4.46.2 Code might not work with newer versions."
+assert torch.__version__.startswith(
+    "2.1"
+), "PyTorch version must be 2.1. Code might not work with newer versions."
+assert transformers.__version__.startswith(
+    "4.46"
+), "Transformers version must be 4.46.2 Code might not work with newer versions."
 
-path = 'meta-llama/Llama-3.1-8B-Instruct'
+path = "meta-llama/Llama-3.1-8B-Instruct"
 
-model = LlamaForCausalLM.from_pretrained(path, torch_dtype=torch.bfloat16, device_map="cuda")
+model = LlamaForCausalLM.from_pretrained(
+    path, torch_dtype=torch.bfloat16, device_map="cuda"
+)
 tokenizer = AutoTokenizer.from_pretrained(path)
 
 # optional gradient checkpointing to save memory (2x forward pass)
@@ -24,11 +30,15 @@ Context: Mount Everest attracts many climbers, including highly experienced moun
 Question: How high did they climb in 1922? According to the text, the 1922 expedition reached 8,"""
 
 # get input embeddings so that we can compute gradients w.r.t. input embeddings
-input_ids = tokenizer(prompt, return_tensors="pt", add_special_tokens=True).input_ids.to(model.device)
+input_ids = tokenizer(
+    prompt, return_tensors="pt", add_special_tokens=True
+).input_ids.to(model.device)
 input_embeds = model.get_input_embeddings()(input_ids)
 
 # inference and get the maximum logit at the last position
-output_logits = model(inputs_embeds=input_embeds.requires_grad_(), use_cache=False).logits
+output_logits = model(
+    inputs_embeds=input_embeds.requires_grad_(), use_cache=False
+).logits
 max_logits, max_indices = torch.max(output_logits[0, -1, :], dim=-1)
 
 # get the top k tokens and their logits
@@ -43,7 +53,9 @@ for token, logit in zip(topk_tokens, topk_logits):
 
 # initialize relevance scores with max_logits itself and backpropagate
 max_logits.backward(max_logits)
-relevance = input_embeds.grad.float().sum(-1).cpu()[0] # cast to float32 before summation for higher precision
+relevance = (
+    input_embeds.grad.float().sum(-1).cpu()[0]
+)  # cast to float32 before summation for higher precision
 
 # normalize relevance between [-1, 1] for plotting
 relevance = relevance / relevance.abs().max()
@@ -52,4 +64,4 @@ relevance = relevance / relevance.abs().max()
 tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
 tokens = clean_tokens(tokens)
 
-pdf_heatmap(tokens, relevance, path='heatmap.pdf', backend='xelatex')
+pdf_heatmap(tokens, relevance, path="heatmap.pdf", backend="xelatex")

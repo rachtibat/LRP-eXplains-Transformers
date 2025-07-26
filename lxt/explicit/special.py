@@ -11,12 +11,15 @@ def _prepare_key_padding_mask(mask, attn_mask, query):
     Prepare the key padding mask for the attention operation.
     """
     # -- broadcast mask
-    assert mask.ndim > 1 # [..., SeqLen]
-    if mask.ndim == 2: # [Batch, ... , ... , SeqLen]
+    assert mask.ndim > 1  # [..., SeqLen]
+    if mask.ndim == 2:  # [Batch, ... , ... , SeqLen]
         b, k_len = mask.shape
         mask = mask.view(b, 1, 1, k_len)
 
-    return F._canonical_mask(mask, "key_padding_mask", F._none_or_dtype(attn_mask), "attn_mask", query.dtype)
+    return F._canonical_mask(
+        mask, "key_padding_mask", F._none_or_dtype(attn_mask), "attn_mask", query.dtype
+    )
+
 
 @torch.no_grad()
 def _prepare_attn_mask(mask, query):
@@ -24,19 +27,36 @@ def _prepare_attn_mask(mask, query):
     Prepare the attention mask for the attention operation.
     """
     # -- broadcast mask
-    assert mask.ndim >= 2 # [..., SeqLen, SeqLen]
-    if mask.ndim == 3: # [Batch * Heads, SeqLen, SeqLen]
+    assert mask.ndim >= 2  # [..., SeqLen, SeqLen]
+    if mask.ndim == 3:  # [Batch * Heads, SeqLen, SeqLen]
         mask = mask.view(query.shape)
 
     return F._canonical_mask(mask, "attn_mask", None, "", query.dtype, False)
 
+
 @torch.fx.wrap
-def multi_head_attention_cp(query, key, value, batch_first, num_heads, head_dim, q_proj_weight, bias_q, k_proj_weight, bias_k, v_proj, out_proj,
-                            key_padding_mask=None, need_weights=True, attn_mask=None, average_attn_weights=True):
+def multi_head_attention_cp(
+    query,
+    key,
+    value,
+    batch_first,
+    num_heads,
+    head_dim,
+    q_proj_weight,
+    bias_q,
+    k_proj_weight,
+    bias_k,
+    v_proj,
+    out_proj,
+    key_padding_mask=None,
+    need_weights=True,
+    attn_mask=None,
+    average_attn_weights=True,
+):
     """
-    Implementing the CP-LRP (Conservative Propagation - LRP) rule for attention i.e. we don't let relevance flow through the softmax, but only through the value path. 
-    This method *only works well in Vision Transformers* because here the advanced AttnLRP rules, which do use the softmax, have similar performance to CP-LRP rules. 
-    The issue with AttnLRP is that using the softmax introduces gradient shattering, which requires applying the z-plus LRP rule. 
+    Implementing the CP-LRP (Conservative Propagation - LRP) rule for attention i.e. we don't let relevance flow through the softmax, but only through the value path.
+    This method *only works well in Vision Transformers* because here the advanced AttnLRP rules, which do use the softmax, have similar performance to CP-LRP rules.
+    The issue with AttnLRP is that using the softmax introduces gradient shattering, which requires applying the z-plus LRP rule.
     This makes AttnLRP slightly less efficient and, based on our limited experiments, the small performance gain is not worthwhile in Vision Transformers.
     However, in Large Language Models, applying AttnLRP on the softmax is substantially better than CP-LRP and does not require the less efficient z-plus rule.
     Therefore, we choose the more efficient CP-LRP for attention and use AttnLRP for other parts of the ViT.
@@ -78,14 +98,12 @@ def multi_head_attention_cp(query, key, value, batch_first, num_heads, head_dim,
         The attention mask
     average_attn_weights: bool
         Whether to average the attention weights
-    
+
     Returns:
     --------
     out: torch.Tensor
         The output tensor of shape [SeqLen, Batch, Embed] if batch_first is False, otherwise [Batch, SeqLen, Embed]
     """
-
-    
 
     if batch_first is False:
         query = query.transpose(0, 1)
@@ -106,7 +124,7 @@ def multi_head_attention_cp(query, key, value, batch_first, num_heads, head_dim,
     k = k.view(batch_size, v_seq_length, num_heads, head_dim)
     v = v.view(batch_size, v_seq_length, num_heads, head_dim)
 
-    q = q.permute(0, 2, 1, 3) # [Batch, Head, SeqLen, Embed]
+    q = q.permute(0, 2, 1, 3)  # [Batch, Head, SeqLen, Embed]
     k = k.permute(0, 2, 1, 3)
     v = v.permute(0, 2, 1, 3)
 

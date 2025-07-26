@@ -1,16 +1,16 @@
 # Copyright 2024, Fraunhofer-Gesellschaft zur Förderung der angewandten Forschung e.V. &
 # the authors: Reduan Achtibat, Sayed Mohammad Vakilzadeh Hatefi, Maximilian Dreyer, Aakriti Jain,
 # Thomas Wiegand, Sebastian Lapuschkin, Wojciech Samek. All rights reserved.
-# 
+#
 # This code is based on the following work:
-# 
+#
 #   'AttnLRP: Attention-Aware Layer-Wise Relevance Propagation for Transformers. ICML 2024.'
 #
 # The copyright in this software is being made available under the Clear BSD License.
 # No patent rights, trademark rights and/or other Intellectual Property Rights other than
 # the copyrights concerning the Software are granted under this license.
 # You may obtain a full copy of the License at
-#     
+#
 #   https://github.com/rachtibat/LRP-eXplains-Transformers/blob/main/LICENSE
 #
 from torch.autograd import Function
@@ -33,7 +33,7 @@ def identity_rule_implicit(fn, input):
     input: torch.Tensor
         The input tensor
     """
-    
+
     return identity_rule_implicit_fn.apply(fn, input)
 
 
@@ -59,7 +59,7 @@ def divide_gradient(input, factor=2):
 def stop_gradient(input):
     """
     Stop the gradient from flowing through the input tensor.
-    This rule is used in CP-LRP (from the paper 
+    This rule is used in CP-LRP (from the paper
     XAI for Transformers: Better Explanations through Conservative Propagation).
     """
 
@@ -89,7 +89,7 @@ class identity_rule_implicit_fn(Function):
 
         output = fn(input)
         if input.requires_grad:
-            ctx.save_for_backward(output/(input + epsilon))
+            ctx.save_for_backward(output / (input + epsilon))
         return output
 
     @staticmethod
@@ -125,4 +125,3 @@ class divide_gradient_fn(Function):
     def backward(ctx, *out_relevance):
 
         return out_relevance[0] / ctx.factor, None
-    

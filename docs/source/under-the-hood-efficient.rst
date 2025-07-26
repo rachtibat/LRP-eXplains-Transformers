@@ -19,7 +19,7 @@ The forward pass of the block can be written as:
 
     x_2 = W_1 \cdot x_1
 
-    x_3 = \text{SiLU}(x_2)
+    x_3 = \text{GeLU}(x_2)
 
     z = W_2 \cdot x_3
 
@@ -47,11 +47,11 @@ Now, let's write it in one line beginning from the last equation:
 
 .. math::
 
-    R^{l-3} = x_1 \odot W_1^T \cdot \frac{\text{SiLU}(x_2)}{x_2 + \varepsilon} \odot W_2^T \cdot \frac{R^l}{z + \varepsilon}
+    R^{l-3} = x_1 \odot W_1^T \cdot \frac{\text{GeLU}(x_2)}{x_2 + \varepsilon} \odot W_2^T \cdot \frac{R^l}{z + \varepsilon}
 
 We notice, that :math:`W_1^T` and :math:`W_2^T` are the Jacobians of the linear layers that are returned by PyTorch's backward pass.
-The only anomaly is the term :math:`\frac{\text{SiLU}(x_2)}{x_2 + \varepsilon}`.
-Assumed, we have a special function that returns a Jacobian :math:`J_2` equal to :math:`\frac{\text{SiLU}(x_2)}{x_2 + \varepsilon}`, then we can rewrite this as a chain of Jacobian-vector products:
+The only anomaly is the term :math:`\frac{\text{GeLU}(x_2)}{x_2 + \varepsilon}`.
+Assumed, we have a special function that returns a Jacobian :math:`J_2` equal to :math:`\frac{\text{GeLU}(x_2)}{x_2 + \varepsilon}`, then we can rewrite this as a chain of Jacobian-vector products:
 
 .. math::
 
@@ -66,17 +66,17 @@ At the end, we have a chain of Jacobian-vector products that only needs to be mu
 
     R^{l-3} = x_1 \odot \text{Gradient}
 
-This means, we only need to make sure that the gradient at the SiLU layer is computed correctly.
-We can do that by e.g. defining a custom Autograd function in PyTorch that computes an identical SiLU forward pass but this modified gradient in the backward pass.
+This means, we only need to make sure that the gradient at the GeLU layer is computed correctly.
+We can do that by e.g. defining a custom Autograd function in PyTorch that computes an identical GeLU forward pass but this modified gradient in the backward pass.
 
 .. code-block:: python
 
-    class SiLUWithModifiedGradient(torch.autograd.Function):
+    class GeLUWithModifiedGradient(torch.autograd.Function):
 
         @staticmethod
         def forward(ctx, x_2, epsilon=1e-10):
 
-            x_3 = nn.SiLU()(x_2)
+            x_3 = nn.GeLU()(x_2)
             ctx.save_for_backward(x_3/(x_2 + epsilon))
             return output
 
@@ -89,5 +89,5 @@ We can do that by e.g. defining a custom Autograd function in PyTorch that compu
 Now, we compute ``z[i].backward()`` in PyTorch, and multiply the input with the gradient ``x_1 * x_1.grad`` to get the attributions.
 The same methodolgy can be applied to the attention and normalization layers in LLMs.
 
-The beauty of this approach is, that PyTorch already returns the correct Jacobian for all linear operation, e.g. addition, and we only need to modify the gradient at the SiLU layer,
+The beauty of this approach is, that PyTorch already returns the correct Jacobian for all linear operation, e.g. addition, and we only need to modify the gradient at the GeLU layer,
 attention and normalization layers. Three modifications that are easy to implement and that reduce the computational costs significantly.

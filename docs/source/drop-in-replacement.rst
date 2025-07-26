@@ -49,22 +49,22 @@ Here is a non-exhaustive table of functionals that we provide. The Equations and
       - LXT
       - Description (Reference to paper)
     * - torch.nn.functional.linear
-      - lxt.functional.linear_epsilon
+      - lxt.explicit.functional.linear_epsilon
       - standard :math:`\varepsilon`-LRP for a linear layer according to the Equation 8
     * - torch.add
-      - lxt.functional.add2
+      - lxt.explicit.functional.add2
       - :math:`\varepsilon`-LRP for the addition of two tensors according to the Equation 8
     * - torch.nn.functional.softmax
-      - lxt.functional.softmax
+      - lxt.explicit.functional.softmax
       - Deep Taylor Decomposition with bias for Softmax according to Proposition 3.1
     * - torch.mul
-      - lxt.functional.mul2
+      - lxt.explicit.functional.mul2
       - uniform rule for elementwise multiplication (along all dimensions) of two tensors according to Proposition 3.2. If one input is a constant, the identity rule is applied.
     * - torch.matmul
-      - lxt.functional.matmul
+      - lxt.explicit.functional.matmul
       - sequential application of the :math:`\varepsilon`-LRP and uniform rule for matrix multiplication according to Proposition 3.3
     * - 
-      - lxt.functional.rms_norm_identity
+      - lxt.explicit.functional.rms_norm_identity
       - computes the root-mean-squared normalization in forward pass and the identity rule in backward according to Proposition 3.4
 
 
@@ -102,11 +102,11 @@ Here is a non-exhaustive table of modules that we provide. The Equations and Pro
       - LXT
       - Description (Reference to paper)
     * - Linear
-      - lxt.modules.LinearEpsilon
+      - lxt.explicit.modules.LinearEpsilon
       - standard :math:`\varepsilon`-LRP for a linear layer according to the Equation 8
     * - Softmax
-      - lxt.modules.SoftmaxDT
+      - lxt.explicit.modules.SoftmaxDT
       - Deep Taylor Decomposition with bias for Softmax according to Proposition 3.1
     * - 
-      - lxt.modules.RMSNormIdentity
+      - lxt.explicit.modules.RMSNormIdentity
       - computes the root-mean-squared normalization in forward pass and the identity rule in backward according to Proposition 3.4

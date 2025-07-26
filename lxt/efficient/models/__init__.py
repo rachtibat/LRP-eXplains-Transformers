@@ -17,13 +17,13 @@ DEFAULT_MAP = {
     vit_torch.vision_transformer: vit_torch.cp_LRP,
 }
 
+
 def get_default_map(module):
     if module in DEFAULT_MAP:
         return DEFAULT_MAP[module]
     else:
         supported_models = ", ".join([key.__name__ for key in DEFAULT_MAP.keys()])
-        raise ValueError(f"{module.__name__} not yet supported. Supported models are: {supported_models} " \
-                         f"Please provide a custom 'patch_map'. Contributions to the GitHub repository are welcome!")
-                 
-
-
+        raise ValueError(
+            f"{module.__name__} not yet supported. Supported models are: {supported_models} "
+            f"Please provide a custom 'patch_map'. Contributions to the GitHub repository are welcome!"
+        )
