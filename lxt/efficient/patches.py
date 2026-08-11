@@ -170,7 +170,7 @@ def mlp_forward(self, x):
 
 def patch_attention(module):
     """
-    Huggingface's transformers library provides a dictionary of all attention functions.
+    Huggingface's transformers library provides a registry of attention functions.
     We patch all of them with the same wrapper function to implement the uniform rule in
     matmul operations via the Gradient*Input framework. It is sufficient to correct the
     gradient flow later at the query, key, and value tensors.
@@ -180,16 +180,13 @@ def patch_attention(module):
         return False
     else:
         module.eager_attention_forward = new_forward
-    
-    NEW_ATTENTION_FUNCTIONS = {}
-    for key, value in module.ALL_ATTENTION_FUNCTIONS.items():
+
+    for key, value in list(module.ALL_ATTENTION_FUNCTIONS.items()):
         new_forward = wrap_attention_forward(value)
         if check_already_patched(value, new_forward):
             return False
         else:
-            NEW_ATTENTION_FUNCTIONS[key] = new_forward
-    module.ALL_ATTENTION_FUNCTIONS = NEW_ATTENTION_FUNCTIONS
-            #module.ALL_ATTENTION_FUNCTIONS[key] = new_forward
+            module.ALL_ATTENTION_FUNCTIONS[key] = new_forward
     return True
 
 
@@ -239,8 +236,8 @@ def patch_cp_attention(module):
         return False
     else:
         module.eager_attention_forward = new_forward
-    
-    for key, value in module.ALL_ATTENTION_FUNCTIONS.items():
+
+    for key, value in list(module.ALL_ATTENTION_FUNCTIONS.items()):
         new_forward = cp_wrap_attention_forward(value)
         if check_already_patched(value, new_forward):
             return False
