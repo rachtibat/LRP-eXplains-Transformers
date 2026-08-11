@@ -5,7 +5,7 @@ import warnings
 import lxt.efficient.models.llama as llama
 import lxt.efficient.models.qwen2 as qwen2
 import lxt.efficient.models.qwen3 as qwen3
-import lxt.efficient.models.qwen3_5 as qwen3_5
+import lxt.efficient.models.qwen3_moe as qwen3_moe
 import lxt.efficient.models.gemma3 as gemma3
 import lxt.efficient.models.gpt2 as gpt2
 try:
@@ -30,7 +30,7 @@ DEFAULT_MAP = {
     llama.modeling_llama: llama.attnLRP,
     qwen2.modeling_qwen2: qwen2.attnLRP,
     qwen3.modeling_qwen3: qwen3.attnLRP,
-    qwen3_5.modeling_qwen3_5: qwen3_5.attnLRP,
+    qwen3_moe.modeling_qwen3_moe: qwen3_moe.attnLRP,
     gemma3.modeling_gemma3: gemma3.attnLRP,
     gpt2.modeling_gpt2: gpt2.attnLRP,
 }
