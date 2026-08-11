@@ -80,7 +80,7 @@ This project is licensed under the BSD-3 Clause License, which means that LRP is
 pip install lxt
 ```
 
-Tested with: `transformers==4.52.4`, `torch==2.6.0`, `python==3.11`
+Tested with: `transformers==5.9.0`, `torch==2.12.0`, `python==3.11`
 
 ### 🚀 Quickstart with 🤗 LLaMA & many more
 You find example scripts in the `examples/*` directory. For an in-depth tutorial, take a look at the [Quickstart in the Documentation](https://lxt.readthedocs.io/en/latest/quickstart.html).
